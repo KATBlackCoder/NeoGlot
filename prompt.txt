@@ -1,0 +1,275 @@
+Tu es un expert en développement d'applications desktop multiplateforme avec Tauri v2, Rust, et Vue 3.
+
+Tu travailles sur **NeoGlot** — une application desktop de traduction de jeux RPG open source.
+Elle extrait les textes de jeux vidéo, les traduit via IA locale (Ollama), et les réinjecte dans les fichiers originaux.
+
+---
+
+## Stack technique
+
+| Couche | Technologie |
+|--------|------------|
+| UI | Vue 3 + TypeScript + Vite — Composition API, `<script setup lang="ts">`, SFCs `.vue` |
+| Desktop | Tauri v2 |
+| UI components | shadcn-vue (Reka UI) + Tailwind CSS v4 (thème sombre, style New York, base Zinc) |
+| Backend | Rust (commandes Tauri) — parsing, SQLite, Ollama, sous-processus |
+| AI | Ollama uniquement (`localhost:11434`) via crate `ollama-rs` (pepperoni21) |
+| Database | SQLite via `rusqlite` (Rust, bundled) — PAS de `tauri-plugin-sql` |
+| Navigation | Vue Router v4 — `createWebHashHistory` (requis Tauri, pas de serveur HTTP) |
+| Data fetching | TanStack Vue Query `@tanstack/vue-query` (queryFn = invoke()) |
+
+**Règles absolues :**
+- Pas de Python, pas de backend HTTP séparé
+- Tout passe par `invoke()` IPC — jamais de `fetch()` vers un backend local
+- Ollama obligatoire : vérifier au démarrage via `invoke('check_ollama')`, bloquer si absent
+- Ne jamais modifier les fichiers sources des jeux — toujours travailler sur des copies (`work_path`)
+- Code commenté en **français**
+- Compatible Linux (CachyOS/Arch) ET Windows
+
+---
+
+## Architecture
+
+```
+Vue 3 (invoke) → Tauri Rust Commands → rusqlite / ollama-rs / rvpacker / std::process
+```
+
+Le frontend communique **uniquement** via `invoke()`. Pas de HTTP, pas de EventSource, pas de WebSocket.
+Le streaming de progression utilise `Channel<T>` de `@tauri-apps/api/core` — compatible Vue 3 (ref réactif).
+
+### Commandes Rust disponibles
+
+| Commande | Rôle |
+|----------|------|
+| `check_ollama` | Vérifie si Ollama est accessible |
+| `list_ollama_models` | Liste les modèles installés |
+| `detect_engine(game_path)` | Détecte le moteur de jeu |
+| `list_projects` | Liste tous les projets |
+| `create_project(...)` | Crée un projet |
+| `delete_project(project_id)` | Supprime un projet |
+| `get_project_progress(project_id)` | Progression `{done, total}` |
+| `store_strings(project_id, strings)` | Stocke les strings extraits |
+| `get_project_strings(project_id, status_filter)` | Récupère les strings |
+| `extract_rpgmv(game_path, work_path)` | Extraction RPG Maker MV/MZ |
+| `extract_rpgm_classic(game_path, work_path)` | Extraction RPG Maker XP/VX/VXAce |
+| `write_rpgmv(game_path, work_path, translations)` | Réinjection RPG Maker |
+| `decrypt_rgss(archive_path, output_path)` | Déchiffrement .rgss/.rgss3 |
+| `start_translation(project_id, model, on_progress: Channel)` | Lance la traduction |
+| `cancel_translation` | Annule la traduction en cours |
+| `list_glossary(project_id)` | Glossaire du projet + global |
+| `add_glossary_term(...)` | Ajoute un terme |
+| `update_glossary_term(...)` | Met à jour un terme |
+| `delete_glossary_term(term_id)` | Supprime un terme |
+| `import_speakers_to_glossary(project_id)` | Import auto des speakers |
+| `extract_wolf(project_id)` | Extraction Wolf RPG |
+| `inject_wolf(project_id)` | Réinjection Wolf RPG |
+
+---
+
+## Moteurs de jeux supportés
+
+| Engine | ID | Format | Crates Rust |
+|--------|-----|--------|-------------|
+| RPG Maker MV | `rpgmv` | JSON | `rvpacker-txt-rs-lib` |
+| RPG Maker MZ | `rpgmz` | JSON | `rvpacker-txt-rs-lib` |
+| RPG Maker XP | `rpgmxp` | Ruby Marshal (.rxdata) | `rvpacker-txt-rs-lib` + `rpgmad-lib` |
+| RPG Maker VX | `rpgmvx` | Ruby Marshal (.rvdata) | `rvpacker-txt-rs-lib` + `rpgmad-lib` |
+| RPG Maker VXAce | `rpgmvxa` | Ruby Marshal (.rvdata2) | `rvpacker-txt-rs-lib` + `rpgmad-lib` |
+| Wolf RPG Editor | `wolf` | Binaire .wolf/.dat | WolfTL + UberWolf (exe bundlé + wine sur Linux) |
+
+---
+
+## Structure du projet
+
+```
+src/                     # Vue 3 frontend
+  main.ts                # createApp + VueQueryPlugin + router
+  App.vue                # <RouterView /> racine
+  router/
+    index.ts             # createRouter + createWebHashHistory
+  components/
+    ui/                  # shadcn-vue (généré)
+    AppShell.vue
+    AppSidebar.vue
+    OllamaStatus.vue
+  views/                 # Pages Vue Router (composition surface — fines)
+    HomeView.vue
+    ProjectsView.vue
+    TranslateView.vue
+    GlossaryView.vue
+    SettingsView.vue
+  composables/           # Logique réactive (= hooks React)
+    useOllama.ts         # check_ollama, list_ollama_models via invoke()
+    useProjects.ts       # list_projects, create_project, delete_project, get_project_progress
+    useGlossary.ts       # list_glossary, add/update/delete term
+    useTranslation.ts    # start_translation via Channel<TranslationProgress>
+    useStore.ts          # tauri-plugin-store prefs
+  types/
+    project.ts
+    glossary.ts
+
+src-tauri/src/           # Rust backend
+  main.rs
+  lib.rs                 # AppState, plugins, generate_handler![]
+  db.rs                  # get_db_path(), init_schema(), open()
+  commands/
+    mod.rs
+    detect.rs            # detect_engine
+    db_commands.rs       # CRUD projets/strings/fichiers + get_project_progress
+    parse.rs             # extract_rpgmv, extract_rpgm_classic
+    write.rs             # write_rpgmv
+    decrypt.rs           # decrypt_rgss
+    translate.rs         # start_translation (Channel streaming) + check_ollama
+    glossary.rs          # CRUD glossaire + import_speakers_to_glossary
+    wolf.rs              # extract_wolf + inject_wolf (subprocess)
+
+docs/                    # Plans et architecture (01 à 05)
+tasks/                   # Backlog T01 à T10
+reviews/                 # Analyses de référence (00-SYNTHESE.md = master)
+```
+
+---
+
+## Base de données SQLite (6 tables)
+
+Fichier unique géré par `rusqlite` (Rust). Initialisé au démarrage via `db::init_schema()`.
+Chemin : `~/.local/share/neoglot/neoglot.db` (Linux) / `%APPDATA%\neoglot\neoglot.db` (Windows)
+
+- **projects** — un projet = un jeu (`id, name, game_path, work_path, engine, source_lang, target_lang, project_context, status`)
+- **files** — fichiers extraits par projet (`id, project_id, relative_path, strings_total, strings_done`)
+- **strings** — textes extraits (`id, file_id, source_hash, source_text, context_path, event_code, row_index, translation, status`)
+- **translation_cache** — cache global inter-projets, clé `(source_hash, model, source_lang, target_lang)`
+- **glossary** — termes imposés (`id, project_id NULL=global, term, translation, note, match_mode`)
+- **translation_jobs** — suivi des jobs (`id, project_id, model, status, strings_total, strings_done`)
+
+---
+
+## Crates Rust clés (Cargo.toml)
+
+```toml
+ollama-rs = { version = "0.2", features = ["stream"] }
+rusqlite = { version = "0.32", features = ["bundled"] }
+tokio = { version = "1", features = ["full"] }
+regex = "1"
+once_cell = "1"
+rvpacker-txt-rs-lib = "11.1.2"
+rpgmad-lib = "4.0.0"
+marshal-rs = "*"
+sha2 = "0.10"
+walkdir = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+```
+
+---
+
+## Plugins Tauri
+
+**Rust** : `tauri-plugin-shell`, `tauri-plugin-fs`, `tauri-plugin-dialog`, `tauri-plugin-store`, `tauri-plugin-log`, `tauri-plugin-window-state`, `tauri-plugin-notification`, `tauri-plugin-process`, `tauri-plugin-clipboard-manager`
+
+**Frontend** : mêmes (préfixe `@tauri-apps/plugin-*`) + `@tauri-apps/api` + `vue-router` + `@tanstack/vue-query` + `@vitejs/plugin-vue`
+
+**Absent intentionnellement** : `tauri-plugin-sql` (rusqlite suffit) et `tauri-plugin-http` (ollama-rs suffit)
+
+---
+
+## Patterns de code
+
+### invoke() — pattern standard (composable Vue)
+
+```typescript
+// src/composables/useProjects.ts
+import { invoke } from '@tauri-apps/api/core';
+import { useQuery } from '@tanstack/vue-query';
+
+export function useProjects() {
+  return useQuery({
+    queryKey: ['projects'],
+    queryFn: () => invoke<Project[]>('list_projects'),
+  });
+}
+```
+
+```vue
+<!-- Vue SFC -->
+<script setup lang="ts">
+import { useProjects } from '@/composables/useProjects';
+const { data: projects, isPending } = useProjects();
+</script>
+```
+
+### Channel — streaming traduction (ref réactif Vue)
+
+```typescript
+// src/composables/useTranslation.ts
+import { ref } from 'vue';
+import { invoke, Channel } from '@tauri-apps/api/core';
+
+export function useTranslation(projectId: number) {
+  const progress = ref({ done: 0, total: 0, status: 'idle' });
+  const isRunning = ref(false);
+
+  const start = async (model: string) => {
+    isRunning.value = true;
+    const channel = new Channel<TranslationProgress>();
+    channel.onmessage = (event) => { progress.value = event; };
+    await invoke('start_translation', { projectId, model, onProgress: channel });
+  };
+
+  return { start, cancel: () => invoke('cancel_translation'), progress, isRunning };
+}
+```
+
+### Vue Router (createWebHashHistory obligatoire dans Tauri)
+
+```typescript
+// src/router/index.ts
+import { createRouter, createWebHashHistory } from 'vue-router';
+const router = createRouter({
+  history: createWebHashHistory(), // hash URLs : /#/projects
+  routes: [ ... ],
+});
+```
+
+### AppState Rust
+
+```rust
+pub struct AppState {
+    pub db_path: PathBuf,
+    pub translation_running: Mutex<bool>,
+}
+
+#[tauri::command]
+pub fn my_command(state: State<'_, AppState>) -> Result<(), String> {
+    let conn = Connection::open(&state.db_path).map_err(|e| e.to_string())?;
+    // ...
+}
+```
+
+---
+
+## Ordre des tâches
+
+T01 → T02 → T03 → T04 → T05 → T06 → T07 → T08 → T09 → T10
+
+| Tâche | Contenu |
+|-------|---------|
+| T01 | Installer plugins + shadcn + Tailwind |
+| T02 | App Shell, routing, useOllama |
+| T03 | AppState, rusqlite, db.rs, db_commands.rs |
+| T04 | Module projets (CRUD UI + detect_engine) |
+| T05 | Extraction RPG Maker MV/MZ |
+| T06 | Moteur de traduction (ollama-rs + Channel streaming) |
+| T07 | Réinjection RPG Maker MV/MZ |
+| T08 | Glossaire |
+| T09 | Wolf RPG (UberWolf + WolfTL) |
+| T10 | RPG Maker XP/VX/VXAce (marshal-rs + rpgmad-lib) |
+
+---
+
+## Commandes de développement
+
+```bash
+pnpm tauri dev     # développement
+pnpm tauri build   # build production
+```
