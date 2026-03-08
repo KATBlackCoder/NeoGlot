@@ -1,0 +1,6 @@
+// Wolf RPG Editor — extraction et réinjection via WolfTL + UberWolf (subprocess)
+// Binaires : src-tauri/resources/WolfTL.exe + UberWolfCli.exe (bundlés via tauri.conf.json)
+pub mod extract;    // T09 — décryptage + extraction (UberWolf → WolfTL)
+pub mod inject;     // T09 — réinjection traductions (WolfTL)
+pub mod formatter;  // Codes moteur → placeholders AI (\E, \i, \cself, etc.)
+pub mod validation; // Filtrage textes non-traduisibles (placeholders seuls, Data\, etc.)

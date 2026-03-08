@@ -40,7 +40,7 @@ rpgmad-lib = "4.0.0"         # déchiffrement .rgss/.rgss2/.rgss3
 
 ### 2. Commande Rust — decrypt_rgss
 
-Créer `src-tauri/src/commands/decrypt.rs` :
+Implémenter dans `src-tauri/src/commands/engines/rpgm_classic/decrypt.rs` :
 
 ```rust
 use rpgmad_lib::Decrypter;
@@ -70,27 +70,15 @@ pub fn decrypt_rgss(
 }
 ```
 
-Enregistrer dans `lib.rs` :
+Les chemins dans `lib.rs` (déjà configurés) :
 ```rust
-mod commands {
-    pub mod detect;
-    pub mod parse;
-    pub mod write;
-    pub mod decrypt;  // nouveau
-}
-
-.invoke_handler(tauri::generate_handler![
-    commands::detect::detect_engine,
-    commands::parse::extract_rpgmv,
-    commands::parse::extract_speakers,
-    commands::write::write_rpgmv,
-    commands::decrypt::decrypt_rgss,  // nouveau
-])
+commands::engines::rpgm_classic::decrypt::decrypt_rgss,
+commands::engines::rpgm_classic::extract::extract_rpgm_classic,
 ```
 
 ### 3. Commande Rust — extract_rpgm_classic
 
-Dans `src-tauri/src/commands/parse.rs`, ajouter :
+Dans `src-tauri/src/commands/engines/rpgm_classic/extract.rs` :
 
 ```rust
 #[tauri::command]

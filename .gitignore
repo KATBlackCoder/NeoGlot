@@ -27,3 +27,4 @@ dist-ssr
 .agents/
 .claude/
 .vscode/
+parsers/

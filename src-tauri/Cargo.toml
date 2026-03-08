@@ -40,8 +40,8 @@ reqwest = { version = "0.13", features = ["json", "blocking"] }
 # Async runtime
 tokio = { version = "1", features = ["full"] }
 
-# Parsing RPG Maker (sera ajouté aux tâches T04/T05)
-# rvpacker-txt-rs-lib, rpgmad-lib, marshal-rs
+# Parsing RPG Maker MV/MZ (T05)
+rvpacker-txt-rs-lib = "11.1.2"
 
 # Utilitaires
 sha2 = "0.10"

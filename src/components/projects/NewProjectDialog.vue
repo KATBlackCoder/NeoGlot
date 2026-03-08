@@ -6,7 +6,7 @@ import { useQueryClient } from '@tanstack/vue-query'
 import { useRouter } from 'vue-router'
 import { FolderSearchIcon, LoaderCircleIcon, CheckCircleIcon, XIcon, RotateCcwIcon } from 'lucide-vue-next'
 import { useProjectStore } from '@/stores'
-import { ENGINE_LABELS } from '@/composables/useProjects'
+import { ENGINE_LABELS } from '@/types/project'
 import type { Project } from '@/types/project'
 import {
   Dialog,
@@ -85,7 +85,7 @@ async function pickGameFolder() {
   try {
     detectedEngine.value = await invoke<string>('detect_engine', { gamePath: gamePath.value })
   } catch (err) {
-    detectError.value = err as string
+    detectError.value = String(err)
   } finally {
     isDetecting.value = false
   }
@@ -97,7 +97,9 @@ async function handleCreate() {
   createError.value = null
 
   try {
-    const workPath = `${gamePath.value}_neoglot_work`
+    // Dossier de travail à l'intérieur du jeu (séparateur adapté à l'OS)
+    const sep = gamePath.value.includes('\\') ? '\\' : '/'
+    const workPath = `${gamePath.value}${sep}.neoglot`
     const project = await invoke<Project>('create_project', {
       name: name.value.trim(),
       gamePath: gamePath.value,
@@ -113,7 +115,7 @@ async function handleCreate() {
     projectStore.setProject(project)
     router.push(`/projects/${project.id}/translate`)
   } catch (err) {
-    createError.value = err as string
+    createError.value = String(err)
   } finally {
     isCreating.value = false
   }
@@ -149,9 +151,9 @@ function resetForm() {
       <div class="space-y-4 py-2">
         <!-- Nom du projet -->
         <div class="space-y-1.5">
-          <label class="text-sm font-medium">Nom du projet</label>
+          <label class="text-sm font-medium" for="project-name">Nom du projet</label>
           <div class="relative">
-            <Input v-model="name" placeholder="Mon jeu RPG" class="pr-8" maxlength="70" />
+            <Input id="project-name" v-model="name" placeholder="Mon jeu RPG" class="pr-8" maxlength="70" />
             <button
               v-if="name"
               type="button"
@@ -165,9 +167,10 @@ function resetForm() {
 
         <!-- Dossier du jeu -->
         <div class="space-y-1.5">
-          <label class="text-sm font-medium">Dossier racine du jeu</label>
+          <label class="text-sm font-medium" for="game-path">Dossier racine du jeu</label>
           <div class="flex gap-2">
             <Input
+              id="game-path"
               :model-value="gamePath"
               readonly
               placeholder="Cliquer pour sélectionner…"
@@ -206,9 +209,9 @@ function resetForm() {
         <!-- Langues -->
         <div class="grid grid-cols-2 gap-3">
           <div class="space-y-1.5">
-            <label class="text-sm font-medium">Langue source</label>
+            <label class="text-sm font-medium" for="source-lang">Langue source</label>
             <Select v-model="sourceLang">
-              <SelectTrigger>
+              <SelectTrigger id="source-lang">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -219,9 +222,9 @@ function resetForm() {
             </Select>
           </div>
           <div class="space-y-1.5">
-            <label class="text-sm font-medium">Langue cible</label>
+            <label class="text-sm font-medium" for="target-lang">Langue cible</label>
             <Select v-model="targetLang">
-              <SelectTrigger>
+              <SelectTrigger id="target-lang">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -235,11 +238,12 @@ function resetForm() {
 
         <!-- Contexte optionnel -->
         <div class="space-y-1.5">
-          <label class="text-sm font-medium">
+          <label class="text-sm font-medium" for="project-context">
             Contexte du projet
             <span class="text-muted-foreground font-normal">(optionnel)</span>
           </label>
           <Textarea
+            id="project-context"
             v-model="projectContext"
             placeholder="Style de traduction attendu, noms propres à conserver…"
             :rows="3"

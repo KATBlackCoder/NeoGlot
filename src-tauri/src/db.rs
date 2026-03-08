@@ -21,7 +21,7 @@ pub fn open(db_path: &Path) -> Result<Connection> {
     Ok(conn)
 }
 
-/// Crée les 6 tables du schéma NeoGlot si elles n'existent pas
+/// Crée les 6 tables du schéma NeoGlot si elles n'existent pas + applique les migrations
 pub fn init_schema(db_path: &Path) -> Result<()> {
     let conn = open(db_path)?;
     conn.execute_batch("
@@ -54,6 +54,7 @@ pub fn init_schema(db_path: &Path) -> Result<()> {
             file_id         INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,
             source_hash     TEXT NOT NULL,
             source_text     TEXT NOT NULL,
+            raw_text        TEXT NOT NULL DEFAULT '',
             context_path    TEXT NOT NULL DEFAULT '',
             event_code      INTEGER,
             row_index       INTEGER DEFAULT 0,
@@ -96,5 +97,23 @@ pub fn init_schema(db_path: &Path) -> Result<()> {
             created_at      DATETIME DEFAULT CURRENT_TIMESTAMP
         );
     ")?;
+
+    // Migrations — ajout de colonnes manquantes sur DB existantes
+    run_migrations(&conn)?;
+
+    Ok(())
+}
+
+/// Applique les migrations incrémentales (ALTER TABLE ADD COLUMN si manquant)
+fn run_migrations(conn: &Connection) -> Result<()> {
+    // Migration 1 : ajout raw_text à strings (v0.5.1)
+    let has_raw_text: bool = conn
+        .prepare("SELECT raw_text FROM strings LIMIT 0")
+        .is_ok();
+    if !has_raw_text {
+        conn.execute_batch(
+            "ALTER TABLE strings ADD COLUMN raw_text TEXT NOT NULL DEFAULT '';"
+        )?;
+    }
     Ok(())
 }

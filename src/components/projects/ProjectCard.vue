@@ -2,7 +2,9 @@
 import { computed } from 'vue'
 import { FolderOpenIcon, Trash2Icon } from 'lucide-vue-next'
 import type { Project } from '@/types/project'
-import { ENGINE_LABELS, useProjectProgress } from '@/composables/useProjects'
+import { ENGINE_LABELS, PROJECT_STATUS_LABELS, PROJECT_STATUS_VARIANTS } from '@/types/project'
+import { useProjectProgress } from '@/composables/useProjects'
+import { calcPercent } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -28,24 +30,9 @@ const emit = defineEmits<{
 
 const { data: progress } = useProjectProgress(props.project.id)
 
-const percentage = computed(() => {
-  if (!progress.value || progress.value.total === 0) return 0
-  return Math.round((progress.value.done / progress.value.total) * 100)
-})
-
-const STATUS_LABELS: Record<string, string> = {
-  created: 'Créé',
-  extracted: 'Extrait',
-  translating: 'En cours',
-  done: 'Terminé',
-}
-
-const STATUS_VARIANTS: Record<string, 'default' | 'secondary' | 'outline' | 'destructive'> = {
-  created: 'secondary',
-  extracted: 'outline',
-  translating: 'default',
-  done: 'default',
-}
+const percentage = computed(() =>
+  calcPercent(progress.value?.done ?? 0, progress.value?.total ?? 0),
+)
 </script>
 
 <template>
@@ -60,8 +47,8 @@ const STATUS_VARIANTS: Record<string, 'default' | 'secondary' | 'outline' | 'des
         </div>
         <p class="text-xs text-muted-foreground truncate">{{ project.game_path }}</p>
       </div>
-      <Badge :variant="STATUS_VARIANTS[project.status] ?? 'secondary'" class="shrink-0">
-        {{ STATUS_LABELS[project.status] ?? project.status }}
+      <Badge :variant="PROJECT_STATUS_VARIANTS[project.status] ?? 'secondary'" class="shrink-0">
+        {{ PROJECT_STATUS_LABELS[project.status] ?? project.status }}
       </Badge>
     </CardHeader>
 
@@ -75,8 +62,8 @@ const STATUS_VARIANTS: Record<string, 'default' | 'secondary' | 'outline' | 'des
       </div>
 
       <div class="flex gap-2">
-        <Button size="sm" class="flex-1" @click="emit('open', project)">
-          <FolderOpenIcon class="size-4 mr-1" />
+        <Button size="sm" class="flex-1 gap-1.5" @click="emit('open', project)">
+          <FolderOpenIcon class="size-4" />
           Ouvrir
         </Button>
 

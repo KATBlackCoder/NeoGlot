@@ -17,15 +17,29 @@
           ┌────────────────▼────────────────────────────────┐
           │              Rust / Tauri                        │
           │                                                  │
-          │  commands/                                       │
-          │    db_commands.rs   ← CRUD projets/strings       │
-          │    detect.rs        ← détection moteur jeu       │
-          │    parse.rs         ← extraction RPG Maker MV/MZ │
-          │    write.rs         ← réinjection RPG Maker      │
-          │    decrypt.rs       ← déchiffrement .rgss        │
-          │    translate.rs     ← pipeline Ollama + cache    │
-          │    glossary.rs      ← CRUD glossaire             │
-          │    wolf.rs          ← Wolf RPG (subprocess)      │
+          │  commands/                                            │
+          │    db_commands.rs   ← CRUD projets/strings          │
+          │    detect.rs        ← détection moteur jeu          │
+          │    translate.rs     ← pipeline Ollama + cache       │
+          │    glossary.rs      ← CRUD glossaire                │
+          │    engines/                                          │
+          │      formatter.rs   ← trait EngineFormatter + UniversalFormatter │
+          │      validation.rs  ← ContentValidator (filtrage universel)      │
+          │      rpgmv/         ← RPG Maker MV/MZ               │
+          │        extract.rs   ← extraction (rvpacker)         │
+          │        inject.rs    ← réinjection (rvpacker)        │
+          │        formatter.rs ← RpgMakerFormatter (placeholders)│
+          │        validation.rs← RpgMakerTextValidator          │
+          │      rpgm_classic/  ← RPG Maker XP/VX/VXAce        │
+          │        extract.rs   ← extraction (marshal-rs)       │
+          │        decrypt.rs   ← déchiffrement .rgss*          │
+          │        formatter.rs ← réutilise RpgMakerFormatter   │
+          │        validation.rs← réutilise RpgMakerTextValidator│
+          │      wolf/          ← Wolf RPG Editor               │
+          │        extract.rs   ← extraction (WolfTL)           │
+          │        inject.rs    ← réinjection (WolfTL)          │
+          │        formatter.rs ← WolfRpgFormatter (placeholders)│
+          │        validation.rs← WolfRpgTextValidator           │
           │                                                  │
           │  plugins:                                        │
           │    tauri-plugin-shell  (WolfTL, UberWolf)        │
@@ -59,7 +73,9 @@
 - **UI** : shadcn-vue (Reka UI) + Tailwind CSS v4, thème sombre
 - **Navigation** : Vue Router v4 (`createWebHashHistory` — requis Tauri, pas de serveur)
 - **IPC** : `invoke()` pour toutes les opérations (pas d'HTTP vers un backend séparé)
-- **Progression** : `new Channel<TranslationProgress>()` depuis `@tauri-apps/api/core` pour suivre l'avancement de la traduction batch (texte par texte, pas streaming token)
+- **Progression extraction** : `listen('extraction-progress', cb)` depuis `@tauri-apps/api/event` — événement émis par Rust après chaque fichier `.txt` traité (`{ current, total, file }`) ; `AlertDialog` modal bloquant avec barre de progression, `await nextTick()` pour garantir le rendu avant le lancement de l'extraction
+- **Feedback utilisateur** : `Toaster` (vue-sonner) monté dans `App.vue` avec `theme="dark" rich-colors` — toast succès/erreur après extraction ; CSS de positionnement importé via `vue-sonner/style.css` dans `main.ts` (requis en v2)
+- **Progression traduction** : `new Channel<TranslationProgress>()` depuis `@tauri-apps/api/core` pour suivre l'avancement de la traduction batch (texte par texte, pas streaming token)
 
 #### Gestion d'état — 3 couches distinctes
 
@@ -86,13 +102,23 @@ Responsabilités : **tout** — parsing, SQLite, Ollama, Wolf RPG, glossaire, ca
 |---------|------|--------|
 | `commands/db_commands.rs` | CRUD projets, fichiers, strings | `rusqlite` |
 | `commands/detect.rs` | Détection moteur de jeu | `walkdir` |
-| `commands/parse.rs` | Extraction textes RPG Maker MV/MZ/XP/VX | `rvpacker-txt-rs-lib` |
-| `commands/write.rs` | Réinjection traductions RPG Maker | `rvpacker-txt-rs-lib` |
-| `commands/decrypt.rs` | Déchiffrement .rgss (RPG Maker XP/VX) | `rpgmad-lib` |
-| `commands/translate.rs` | Pipeline traduction Ollama batch + cache + Channel progression | `reqwest`, `rusqlite`, `regex` |
+| `commands/engines/formatter.rs` | Trait `EngineFormatter` + `UniversalFormatter` (placeholders communs) | `regex`, `once_cell` |
+| `commands/engines/validation.rs` | `ContentValidator` (filtrage universel textes non-traduisibles) | — |
+| `commands/engines/rpgmv/extract.rs` | Extraction textes RPG Maker MV/MZ + validation + formatage | `rvpacker-txt-rs-lib`, `sha2` |
+| `commands/engines/rpgmv/inject.rs` | Réinjection traductions RPG Maker MV/MZ | `rvpacker-txt-rs-lib` |
+| `commands/engines/rpgmv/formatter.rs` | `RpgMakerFormatter` — codes `\C`, `\N`, `\V`, `\I` → placeholders | `regex`, `once_cell` |
+| `commands/engines/rpgmv/validation.rs` | `RpgMakerTextValidator` — filtrage spécifique RPG Maker | — |
+| `commands/engines/rpgm_classic/extract.rs` | Extraction RPG Maker XP/VX/VXAce (T10) | `marshal-rs` |
+| `commands/engines/rpgm_classic/decrypt.rs` | Déchiffrement .rgss* | `rpgmad-lib` |
+| `commands/engines/rpgm_classic/formatter.rs` | Réexporte `RpgMakerFormatter` (mêmes codes moteur) | — |
+| `commands/engines/rpgm_classic/validation.rs` | Réexporte `RpgMakerTextValidator` | — |
+| `commands/engines/wolf/extract.rs` | Extraction Wolf RPG via WolfTL (T09) | `std::process::Command` |
+| `commands/engines/wolf/inject.rs` | Réinjection Wolf RPG via WolfTL (T09) | `std::process::Command` |
+| `commands/engines/wolf/formatter.rs` | `WolfRpgFormatter` — codes `\E`, `\i`, `\cself`, `@n` → placeholders | `regex`, `once_cell` |
+| `commands/engines/wolf/validation.rs` | `WolfRpgTextValidator` — filtrage spécifique Wolf RPG | `regex`, `once_cell` |
+| `commands/translate.rs` | Pipeline traduction Ollama batch + `PromptType` + `EngineFormatter` + Channel progression | `reqwest`, `rusqlite`, `regex` |
 | `commands/glossary.rs` | CRUD glossaire + QC post-traduction | `rusqlite` |
-| `commands/wolf.rs` | Extraction/réinjection Wolf RPG | `std::process::Command` |
-| `db.rs` | Init SQLite, schéma, WAL mode | `rusqlite` |
+| `db.rs` | Init SQLite, schéma, WAL mode, migrations auto (`raw_text`) | `rusqlite` |
 
 ### AppState (partagé entre commandes)
 
@@ -118,7 +144,7 @@ Voir `docs/02-database-schema.md` pour le schéma complet.
 ```
 Tauri démarre
   │
-  ├─ [Rust] AppState::new() → open_db() → init_schema() (WAL + FK)
+  ├─ [Rust] AppState::new() → open_db() → init_schema() (WAL + FK) → run_migrations()
   │
   ├─ tauri_plugin_window_state::restore()  ← restaure taille/position fenêtre
   │

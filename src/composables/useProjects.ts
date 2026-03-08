@@ -4,18 +4,8 @@ import { useRouter } from 'vue-router'
 import type { Project } from '@/types/project'
 import { useProjectStore } from '@/stores'
 
-// ─── Labels lisibles par moteur ──────────────────────────────────────────────
-
-export const ENGINE_LABELS: Record<string, string> = {
-  rpgmz: 'RPG Maker MZ',
-  rpgmv: 'RPG Maker MV',
-  rpgmxp: 'RPG Maker XP',
-  rpgmvx: 'RPG Maker VX',
-  rpgmvxa: 'RPG Maker VXAce',
-  wolf: 'Wolf RPG',
-  bakin: 'RPG Bakin',
-  unknown: 'Inconnu',
-}
+// ENGINE_LABELS est dans types/project.ts — ré-exporté pour rétrocompat
+export { ENGINE_LABELS } from '@/types/project'
 
 // ─── Composables ─────────────────────────────────────────────────────────────
 

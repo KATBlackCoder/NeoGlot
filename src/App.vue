@@ -1,7 +1,8 @@
 <script setup lang="ts">
-// Racine minimaliste — routing géré par AppShell
+import { Toaster } from '@/components/ui/sonner'
 </script>
 
 <template>
   <RouterView />
+  <Toaster theme="dark" rich-colors position="bottom-right" />
 </template>

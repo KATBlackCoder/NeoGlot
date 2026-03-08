@@ -71,7 +71,7 @@ fn get_wolf_exe(app: &tauri::AppHandle, name: &str) -> PathBuf {
 }
 ```
 
-### 2. Commandes Rust — src-tauri/src/commands/wolf.rs
+### 2. Commandes Rust — src-tauri/src/commands/engines/wolf/
 
 ```rust
 use std::path::Path;

@@ -56,6 +56,15 @@ game_path/
 | 405 | Show Scroll Text | OUI |
 | 108 | Commentaire | NON |
 
+### Validation + Formatage (intégré à l'extraction)
+
+| Module | Rôle |
+|--------|------|
+| `engines/validation.rs` | `ContentValidator` — filtrage universel (vide, placeholders, IDs techniques, code JS) |
+| `rpgmv/validation.rs` | `RpgMakerTextValidator` — filtrage spécifique (ponctuation, chemins, commandes script) |
+| `engines/formatter.rs` | `UniversalFormatter` — patterns communs (`%n` → `[ARG_n]`, guillemets japonais, whitespace) |
+| `rpgmv/formatter.rs` | `RpgMakerFormatter` — codes `\C[n]` → `[COLOR_n]`, `\N[n]` → `[NAME_n]`, etc. |
+
 ### Crates Rust
 
 ```toml
@@ -139,6 +148,13 @@ game_path/
 | 102 | ShowChoices (choix) |
 | 122 | SetStringVariable |
 | 250 | CallDatabase (peut contenir texte affiché) |
+
+### Validation + Formatage Wolf RPG
+
+| Module | Rôle |
+|--------|------|
+| `wolf/validation.rs` | `WolfRpgTextValidator` — suppression itérative placeholders, chiffres seuls, debug `X[`, chemins `Data\` |
+| `wolf/formatter.rs` | `WolfRpgFormatter` — codes `\E` → `[WOLF_END]`, `@n` → `[WOLF_VAR_n]`, `\cself[n]`, `\c[n]`/`\C[n]`, etc. |
 
 ### Problème Linux
 

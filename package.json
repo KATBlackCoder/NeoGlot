@@ -8,7 +8,7 @@
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "tauri:linux": "WEBKIT_DISABLE_COMPOSITING_MODE=1 GDK_BACKEND=x11 npm run tauri dev"
+    "tauri:linux": "WEBKIT_DISABLE_COMPOSITING_MODE=1 GDK_BACKEND=x11 RUSTFLAGS='-C target-feature=+aes,+sse2' pnpm tauri dev"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.2.1",

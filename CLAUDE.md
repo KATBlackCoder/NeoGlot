@@ -50,7 +50,20 @@ src/
 └── lib/           # Utilitaires (cn() Tailwind)
 src-tauri/
 ├── resources/ # Binaires Wolf RPG : WolfTL.exe + UberWolfCli.exe (bundlés via tauri.conf.json)
-└── src/       # Rust/Tauri backend (parsing, SQLite, Ollama, Wolf RPG)
+└── src/
+    ├── commands/
+    │   ├── engines/
+    │   │   ├── formatter.rs   # Trait EngineFormatter + UniversalFormatter (partagé)
+    │   │   ├── validation.rs  # ContentValidator (filtrage universel)
+    │   │   ├── rpgmv/         # T05/T07 — extract + inject + formatter + validation
+    │   │   ├── rpgm_classic/  # T10     — extract + decrypt + formatter + validation
+    │   │   └── wolf/          # T09     — extract + inject + formatter + validation
+    │   ├── db_commands.rs     # T03 — CRUD projets, fichiers, strings
+    │   ├── detect.rs          # T04 — détection moteur de jeu
+    │   ├── translate.rs       # T06 — pipeline Ollama + Channel
+    │   └── glossary.rs        # T08 — CRUD glossaire
+    ├── db.rs                  # SQLite : get_db_path, open, init_schema, run_migrations
+    └── lib.rs                 # AppState + plugins + generate_handler![]
 ```
 
 ## Key Documents

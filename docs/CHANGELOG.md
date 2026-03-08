@@ -7,6 +7,144 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 ## [Unreleased]
 
+### Refactored — Qualité code + design UI (2026-03-08)
+
+**DRY — Centralisation des constantes de domaine dans `types/project.ts`**
+
+- `ENGINE_LABELS` déplacé de `useProjects.ts` (composable) vers `types/project.ts` (domaine) ; ré-exporté depuis `useProjects` pour rétrocompatibilité
+- `PROJECT_STATUS_LABELS` + `PROJECT_STATUS_VARIANTS` — nouvelles constantes centralisées (étaient dupliquées dans `ProjectCard.vue`)
+- `STRING_STATUS_LABELS` + `STRING_STATUS_VARIANTS` — nouvelles constantes centralisées (étaient locales dans `StringList.vue`)
+- `ProjectProgress` interface nettoyée : suppression des champs `project_id` et `percentage` qui ne correspondaient pas au retour backend
+
+**DRY — Utilitaire `calcPercent()` dans `src/lib/utils.ts`**
+
+- `calcPercent(done, total): number` — remplace 5 implémentations identiques de `Math.round((done/total)*100)` présentes dans `TranslateView.vue`, `ProjectCard.vue`, `FileList.vue`, `translationStore.ts`
+
+**Bugs critiques corrigés**
+
+- `HomeView.vue` — suppression du bouton de debug `Give me a toast` (anglais, en production)
+- `HomeView.vue` — carte "Nouveau projet" ouvre maintenant directement `NewProjectDialog` au lieu de rediriger vers `/projects` (même destination que "Mes projets")
+- `GlossaryView.vue` — typage `entries: never[]` → `entries: GlossaryEntry[]` + suppression de 5 casts `as any` dans le template
+- `NewProjectDialog.vue` — deux `catch (err) as string` remplacés par `String(err)` (évite `[object Object]` si Tauri retourne un objet)
+
+**Accessibilité**
+
+- `NewProjectDialog.vue` — tous les `<label>` ont désormais un attribut `for` associé à leur `<input>` via `id` (champs : nom, dossier, langue source, langue cible, contexte)
+
+**Design UI**
+
+- `OllamaStatus.vue` — `bg-green-600 text-white hover:bg-green-700` (couleur hardcodée) remplacé par `variant="outline"` avec tokens CSS variables (`text-emerald-600 dark:text-emerald-400 border-emerald-500/50`) — compatible dark mode
+- `StringList.vue` — 4 `<button>` natifs avec classes Tailwind manuelles remplacés par `<ToggleGroup>` shadcn-vue (accessible, keyboard-navigable) ; composant `toggle-group` + `toggle` ajoutés
+- `FileList.vue` — `text-green-500` hardcodé → `text-emerald-500 dark:text-emerald-400`
+- `ProjectCard.vue` — `<FolderOpenIcon class="size-4 mr-1">` remplacé par `gap-1.5` sur le bouton parent (pattern cohérent avec le reste de l'UI)
+- `TranslateView.vue` — boutons "Traduire" et "Exporter" (`disabled`) wrappés dans `<Tooltip>` avec messages explicatifs ("Disponible après l'extraction des textes", "Disponible une fois la traduction terminée")
+- `HomeView.vue` — grille de 4 cartes d'actions rapides (Mes projets, Nouveau projet, Glossaire, Paramètres) avec hover animé sur l'icône via group Tailwind ; architecture déclarative avec `QUICK_ACTIONS[]`
+- `ProjectsView.vue` + `GlossaryView.vue` — `data-icon="inline-start"` remplacé par `class="size-4"` cohérent
+
+**Composants shadcn-vue ajoutés**
+
+- `toggle` — composant base (dépendance de toggle-group)
+- `toggle-group` + `toggle-group-item` — groupes de boutons à sélection unique/multiple
+
+---
+
+### Added — Système de formatage/validation texte (EngineFormatter + ContentValidator)
+
+**Architecture modulaire par moteur** — porté depuis l'analyse de `parsers/`
+
+- `engines/formatter.rs` — trait `EngineFormatter` (`prepare_for_translation` / `restore_after_translation`) + `UniversalFormatter` (patterns communs : `%n` → `[ARG_n]`, guillemets japonais, whitespace, codes contrôle)
+- `engines/validation.rs` — `ContentValidator` (filtrage universel : vide, placeholders seuls, identifiants techniques EV/MAP, code JS, extensions de fichiers, pipes)
+- `rpgmv/formatter.rs` — `RpgMakerFormatter` : codes `\C[n]` → `[COLOR_n]`, `\N[n]` → `[NAME_n]`, `\V[n]`, `\I[n]`, `\W[n]`, `\A[n]`, `\P[n]`, `\G`, `\$`, `\F`, `\AA` + délégation `UniversalFormatter`
+- `rpgmv/validation.rs` — `RpgMakerTextValidator` : ponctuation seule, chemins de fichiers (sauf codes `\n[`, `\C[`, `\N[`)
+- `wolf/formatter.rs` — `WolfRpgFormatter` : codes `\E`, `\i[n]`, `\f[n]`, `@n`, `\cself[n]`, `\c[n]`/`\C[n]` (distinction case), `\sys[n]`, `\font[n]`, `\ax`, `\ay`, `\v[n]`, `\cdb`, `\-[n]`, `\space[n]`, `<C>`, `<R>`, `\>`, `<<`, `>>`
+- `wolf/validation.rs` — `WolfRpgTextValidator` : suppression itérative placeholders (simples + imbriqués), filtrage chiffres seuls, `X[` (debug), extensions, chemins `Data\`/`Data/`
+- `rpgm_classic/formatter.rs` — réexporte `RpgMakerFormatter` (mêmes codes moteur)
+- `rpgm_classic/validation.rs` — réexporte `RpgMakerTextValidator`
+
+**Intégration dans l'extraction**
+
+- `extract_rpgmv` applique désormais `RpgMakerTextValidator::validate_text()` puis `RpgMakerFormatter::prepare_for_translation()` avant insertion SQLite
+- Colonne `raw_text` ajoutée à la table `strings` (texte original avec codes moteur intacts)
+- `source_text` contient le texte formaté (placeholders AI-friendly) — prêt pour envoi direct à Ollama
+- `StringEntry` côté Rust et TypeScript mis à jour avec `raw_text`
+- Requête `get_project_strings` étendue pour inclure `raw_text`
+
+**Impact** : moins de strings inutiles envoyés à Ollama, codes moteur protégés par placeholders, restauration fiable après traduction
+
+---
+
+### Fixed — Bugs post-T05
+
+**Bug : clic sur fichier dans FileList sans effet**
+- `useProjectStrings` recevait `.value` évalué une seule fois à l'initialisation (valeur statique) → la query ne se ré-exécutait jamais quand `selectedPath` changeait
+- Fix : signature modifiée en `MaybeRef<string | undefined>` + `queryKey` via `computed()` réactif
+- `src/composables/useTranslate.ts` — `useProjectStrings` accepte maintenant `MaybeRef<string | undefined>`
+- `src/views/TranslateView.vue` — passage d'un `computed()` à `useProjectStrings` au lieu de `.value`
+
+**Bug : invoke `create_project` → "missing required key p"**
+- La commande Rust utilisait `p: NewProject` (struct wrappé) → Tauri attendait `{ p: { ... } }` côté frontend
+- Fix : paramètres aplatis dans la signature Rust (`name`, `game_path`, `work_path`, etc.)
+- Tauri v2 convertit automatiquement camelCase → snake_case
+- `src-tauri/src/commands/db_commands.rs` — `create_project` refactoré + struct `NewProject` supprimé
+
+**Bug : textes non affichés après extraction (table strings sans raw_text)**
+- Les bases SQLite existantes n'avaient pas la colonne `raw_text` → `INSERT` échouait silencieusement
+- Fix : migration automatique dans `db.rs` (`ALTER TABLE strings ADD COLUMN raw_text`) + cleanup avant ré-extraction (`DELETE FROM strings/files WHERE project_id`)
+
+**Bug : toasts vue-sonner invisibles**
+- vue-sonner v2 n'injecte plus ses styles automatiquement → `[data-sonner-toaster]` sans `position: fixed` → invisible sous le layout
+- Fix : import explicite de `vue-sonner/style.css` dans `src/main.ts`
+- Fix : props `theme="dark"`, `rich-colors`, `position="bottom-right"` ajoutés sur `<Toaster />` dans `App.vue`
+
+**Bug : AlertDialog d'extraction invisible**
+- `isExtracting = true` et le lancement de l'extraction se faisaient dans le même flush cycle Vue → le dialog n'avait pas le temps de se rendre avant que l'extraction commence
+- Fix : `await nextTick()` forcé après `isExtracting.value = true` pour garantir le rendu du dialog avant de procéder
+- Ref manuelle `isExtracting` (au lieu de `isPending` de TanStack Query) pour contrôle explicite du cycle de vie du dialog
+
+**Bug : code JavaScript visible dans les textes extraits**
+- `ContentValidator` : filtrage étendu aux patterns `();`, `);`, `function `, `var `, `this.`, `self.`, et appels de méthodes ASCII `mot.mot(`
+- `RpgMakerTextValidator` : filtrage des commandes de script RPG Maker (ASCII pur, type `PSS start`, `COMMANDE argument`)
+
+### Added — UX extraction améliorée
+
+- `src/views/TranslateView.vue` — `AlertDialog` modal bloquant pendant l'extraction : barre de progression, fichier en cours, empêche navigation (`@pointer-down-outside.prevent`, `@escape-key-down.prevent`)
+- `src/App.vue` — `Toaster` (vue-sonner) intégré à la racine pour toast succès/erreur post-extraction
+- `engines/rpgmv/extract.rs` — `extract_rpgmv` reçoit `AppHandle` et émet l'événement `extraction-progress` (`{ current, total, file }`) après chaque fichier `.txt` traité
+
+### Analyzed — parsers/ (décision d'intégration partielle pour T06)
+
+- Répertoire `parsers/` analysé : parser maison avec `GameEngineHandler` trait, `EngineFactory`, `TextUnit` + `PromptType` (Character, Dialogue, Item, Skill, System…), `EngineFormatter` trait (`prepare_for_translation` / `restore_after_translation`)
+- **Décision** : ne pas remplacer `rvpacker-txt-rs-lib` (extraction MV/MZ déjà opérationnelle)
+- **À intégrer en T06** : `PromptType` (catégorisation texte pour les prompts Ollama) + `EngineFormatter` (protection des placeholders `\C[1]`, `\n`, etc.)
+
+---
+
+### Refactored — Rust : reorganisation commands/ par moteur de jeu
+
+- `src-tauri/src/commands/engines/` créé : chaque moteur dispose de ses propres modules `extract.rs` + `inject.rs` (ou `decrypt.rs`)
+- `engines/rpgmv/` — `extract.rs` (contenu de l'ancien `parse.rs`) + `inject.rs` (ancien `write.rs`)
+- `engines/rpgm_classic/` — `extract.rs` + `decrypt.rs` (anciens stubs de `parse.rs` + `decrypt.rs`)
+- `engines/wolf/` — `extract.rs` + `inject.rs` (ancien `wolf.rs` splitté)
+- Anciens fichiers supprimés : `parse.rs`, `write.rs`, `decrypt.rs`, `wolf.rs`
+- `commands/mod.rs` et `lib.rs` mis à jour pour les nouveaux chemins de modules
+
+---
+
+### Added — T05 : Module RPG Maker MV/MZ Extraction
+
+**Backend Rust**
+- `src-tauri/Cargo.toml` — `rvpacker-txt-rs-lib = "11.1.2"` (requiert `RUSTFLAGS="-C target-feature=+aes,+sse2"`)
+- `src-tauri/src/commands/engines/rpgmv/extract.rs` — `extract_rpgmv()` complet (Reader → .txt → SQLite) + `extract_speakers()` (noms via `<!-- NAME -->`)
+- `src-tauri/src/commands/db_commands.rs` — `list_project_files` + struct `FileEntry` ; fix `create_project` → retourne `Project`
+
+**Frontend**
+- `src/composables/useTranslate.ts` — `useProjectFiles`, `useProjectStrings`, `useExtractProject`
+- `src/components/translate/FileList.vue` — liste fichiers avec progression
+- `src/components/translate/StringList.vue` — liste strings avec filtre statut + recherche
+- `src/views/TranslateView.vue` — rewrite complet avec extraction, panneau fichiers/strings
+
+---
+
 ### Added — T04 : Module Projets (CRUD + détection moteur)
 
 **Frontend**

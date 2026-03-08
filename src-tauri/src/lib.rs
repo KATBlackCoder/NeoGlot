@@ -52,32 +52,33 @@ pub fn run() {
             commands::translate::list_ollama_models,
             commands::translate::cancel_translation,
             commands::translate::start_translation,
-            // T03 — CRUD projets / strings
+            // T03/T05 — CRUD projets / fichiers / strings
             commands::db_commands::list_projects,
             commands::db_commands::create_project,
             commands::db_commands::delete_project,
+            commands::db_commands::list_project_files,
             commands::db_commands::store_strings,
             commands::db_commands::get_project_strings,
             commands::db_commands::get_project_progress,
             // T04 — Détection moteur
             commands::detect::detect_engine,
-            // T05/T10 — Extraction RPG Maker
-            commands::parse::extract_rpgmv,
-            commands::parse::extract_speakers,
-            commands::parse::extract_rpgm_classic,
-            // T07 — Réinjection RPG Maker
-            commands::write::write_rpgmv,
-            // T10 — Déchiffrement .rgss*
-            commands::decrypt::decrypt_rgss,
+            // T05 — Extraction RPG Maker MV/MZ
+            commands::engines::rpgmv::extract::extract_rpgmv,
+            commands::engines::rpgmv::extract::extract_speakers,
+            // T07 — Réinjection RPG Maker MV/MZ
+            commands::engines::rpgmv::inject::write_rpgmv,
+            // T10 — Extraction + déchiffrement RPG Maker XP/VX/VXAce
+            commands::engines::rpgm_classic::extract::extract_rpgm_classic,
+            commands::engines::rpgm_classic::decrypt::decrypt_rgss,
             // T08 — Glossaire
             commands::glossary::list_glossary,
             commands::glossary::add_glossary_term,
             commands::glossary::update_glossary_term,
             commands::glossary::delete_glossary_term,
             commands::glossary::import_speakers,
-            // T09 — Wolf RPG
-            commands::wolf::extract_wolf,
-            commands::wolf::inject_wolf,
+            // T09 — Wolf RPG Editor
+            commands::engines::wolf::extract::extract_wolf,
+            commands::engines::wolf::inject::inject_wolf,
         ])
         .run(tauri::generate_context!())
         .expect("Erreur au démarrage de NeoGlot");

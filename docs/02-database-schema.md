@@ -45,7 +45,8 @@ CREATE TABLE IF NOT EXISTS strings (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     file_id         INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,
     source_hash     TEXT NOT NULL,          -- SHA256(source_text) pour déduplication
-    source_text     TEXT NOT NULL,
+    source_text     TEXT NOT NULL,          -- texte formaté (placeholders AI) envoyé à Ollama
+    raw_text        TEXT NOT NULL DEFAULT '',  -- texte original avant formatage (codes moteur intacts)
     context_path    TEXT NOT NULL DEFAULT '',  -- ex: 'Map001/event_12/page_0/cmd_5' (SLR pattern)
     event_code      INTEGER,               -- code EVENT RPG Maker (101, 401, etc.) ou Wolf (101, 102)
     row_index       INTEGER,               -- position dans le fichier pour réinjection
@@ -133,13 +134,28 @@ const strings = await invoke<StringEntry[]>(
 ### Accès Rust (écriture — rusqlite)
 
 ```rust
-// Batch insert strings après extraction (db_commands.rs)
-for s in &strings {
+// Batch insert strings après extraction (extract_rpgmv)
+for (raw, formatted) in &sources {
     conn.execute(
-        "INSERT OR IGNORE INTO strings (file_id, source_hash, source_text, context_path, event_code, row_index)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-        params![file_id, s.source_hash, s.source_text, s.context_path, s.event_code, s.row_index],
+        "INSERT OR IGNORE INTO strings (file_id, source_hash, source_text, raw_text, context_path, event_code, row_index)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        params![file_id, hash, formatted, raw, ctx, code, idx],
     )?;
+}
+```
+
+### Migrations automatiques
+
+Au démarrage, `init_schema()` appelle `run_migrations()` qui vérifie et applique les migrations :
+
+```rust
+fn run_migrations(conn: &Connection) -> Result<()> {
+    // Migration 1 : ajout colonne raw_text
+    let has_raw_text = conn.prepare("SELECT raw_text FROM strings LIMIT 0").is_ok();
+    if !has_raw_text {
+        conn.execute_batch("ALTER TABLE strings ADD COLUMN raw_text TEXT NOT NULL DEFAULT '';")?;
+    }
+    Ok(())
 }
 ```
 

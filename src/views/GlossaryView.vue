@@ -12,12 +12,13 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
+import type { GlossaryEntry } from '@/types/glossary'
 
 const route = useRoute()
 const projectId = route.params.id as string
 
 // Données vides — seront chargées via invoke('list_glossary') en T08
-const entries: never[] = []
+const entries: GlossaryEntry[] = []
 </script>
 
 <template>
@@ -34,8 +35,8 @@ const entries: never[] = []
         <Button variant="outline" size="sm" disabled>
           Importer speakers
         </Button>
-        <Button size="sm" disabled>
-          <PlusIcon data-icon="inline-start" />
+        <Button size="sm" disabled class="gap-1.5">
+          <PlusIcon class="size-4" />
           Ajouter un terme
         </Button>
       </div>
@@ -55,13 +56,13 @@ const entries: never[] = []
         <TableEmpty v-if="entries.length === 0">
           Aucun terme dans le glossaire. Ajoutez des termes pour guider la traduction.
         </TableEmpty>
-        <TableRow v-for="entry in entries" :key="(entry as any).id">
-          <TableCell class="font-medium">{{ (entry as any).term }}</TableCell>
-          <TableCell>{{ (entry as any).translation }}</TableCell>
+        <TableRow v-for="entry in entries" :key="entry.id">
+          <TableCell class="font-medium">{{ entry.term }}</TableCell>
+          <TableCell>{{ entry.translation }}</TableCell>
           <TableCell>
-            <Badge variant="outline">{{ (entry as any).match_mode }}</Badge>
+            <Badge variant="outline">{{ entry.match_mode }}</Badge>
           </TableCell>
-          <TableCell class="text-muted-foreground text-sm">{{ (entry as any).note }}</TableCell>
+          <TableCell class="text-muted-foreground text-sm">{{ entry.note }}</TableCell>
           <TableCell></TableCell>
         </TableRow>
       </TableBody>

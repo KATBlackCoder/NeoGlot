@@ -1,6 +1,6 @@
 # T05 — Module RPG Maker MV/MZ : Extraction
 
-**Statut** : TODO
+**Statut** : DONE
 **Dépendances** : T04 (projets créés), T01 (Cargo.toml prêt)
 
 ---
@@ -24,7 +24,7 @@ serde_json = "1"
 sha2 = "0.10"      # pour hashes SHA256 côté Rust
 ```
 
-### 2. Créer src-tauri/src/commands/parse.rs
+### 2. Créer src-tauri/src/commands/engines/rpgmv/extract.rs
 
 ```rust
 use rvpacker_txt_rs_lib::{GameType, read_dir};
@@ -100,11 +100,13 @@ pub fn extract_speakers(game_path: String) -> Result<Vec<String>, String> {
 
 Enregistrer dans `lib.rs` :
 ```rust
-mod commands { pub mod parse; pub mod detect; }
+// commands/mod.rs : pub mod engines;
+// commands/engines/mod.rs : pub mod rpgmv;
+// commands/engines/rpgmv/mod.rs : pub mod extract;
 .invoke_handler(tauri::generate_handler![
     commands::detect::detect_engine,
-    commands::parse::extract_rpgmv,
-    commands::parse::extract_speakers,
+    commands::engines::rpgmv::extract::extract_rpgmv,
+    commands::engines::rpgmv::extract::extract_speakers,
 ])
 ```
 

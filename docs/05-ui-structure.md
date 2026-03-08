@@ -141,7 +141,8 @@ Vue principale de traduction pour un projet.
 └──────────────────────────────────────────────────────────┘
 ```
 
-**Composants shadcn-vue** : `ResizablePanelGroup`, `ScrollArea`, `Badge`, `Progress`, `Button`, `Select`, `Input`
+**Composants shadcn-vue** : `ResizablePanelGroup`, `ScrollArea`, `Badge`, `Progress`, `Button`, `Select`, `Input`, `AlertDialog` (overlay extraction)
+**Extraction** : `AlertDialog` modal bloquant pendant l'extraction (barre de progression, fichier en cours, empêche navigation) ; `await nextTick()` pour garantir le rendu avant lancement ; toast succès/erreur via `vue-sonner`
 **Streaming** : `Channel<TranslationProgress>` de `@tauri-apps/api/core` via `useTranslation()` composable
 
 ---
@@ -236,7 +237,7 @@ Affiché au démarrage si Ollama n'est pas disponible.
 ```
 src/
 ├── main.ts                      # createApp + Pinia + VueQueryPlugin + router + mount
-├── App.vue                      # <RouterView /> racine
+├── App.vue                      # <RouterView /> + <Toaster /> (vue-sonner)
 ├── router/
 │   └── index.ts                 # createRouter + createWebHashHistory (Tauri)
 ├── stores/                      # Pinia — état client partagé entre composants
@@ -257,7 +258,8 @@ src/
 ├── composables/                 # Logique réactive + TanStack Vue Query (state serveur)
 │   ├── useOllama.ts             # check_ollama + list_ollama_models
 │   ├── useProjects.ts           # list_projects, create_project, delete_project, useOpenProject
-│   ├── useTranslation.ts        # start_translation via Channel → met à jour translationStore
+│   ├── useTranslate.ts          # useProjectFiles, useProjectStrings, useExtractProject (T05)
+│   ├── useTranslation.ts        # start_translation via Channel → met à jour translationStore (T06)
 │   ├── useGlossary.ts           # list_glossary, add/update/delete term
 │   └── useStore.ts              # tauri-plugin-store prefs (settings persistés)
 ├── lib/

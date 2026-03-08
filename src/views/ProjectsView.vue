@@ -20,8 +20,8 @@ const isDialogOpen = ref(false)
         <h1 class="text-2xl font-bold tracking-tight">Projets</h1>
         <p class="text-muted-foreground">Gérez vos traductions de jeux RPG.</p>
       </div>
-      <Button @click="isDialogOpen = true">
-        <PlusIcon data-icon="inline-start" />
+      <Button @click="isDialogOpen = true" class="gap-1.5">
+        <PlusIcon class="size-4" />
         Nouveau projet
       </Button>
     </div>

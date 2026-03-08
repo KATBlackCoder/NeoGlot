@@ -55,10 +55,23 @@ Utilisateur ouvre un projet
            └──────────────────┬────────────────────────┘
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
+│  ÉTAPE 4.5 — Validation + Formatage (intégré à l'extraction)    │
+│  [Rust] ContentValidator + EngineValidator                       │
+│  → filtre textes non-traduisibles (vide, placeholders seuls,    │
+│    identifiants techniques, code JS, commandes script)          │
+│  [Rust] EngineFormatter::prepare_for_translation()               │
+│  → codes moteur → placeholders AI-friendly :                     │
+│    \C[1] → [COLOR_1], \N[2] → [NAME_2], \E → [WOLF_END]       │
+│  → source_text = texte formaté, raw_text = texte original       │
+└─────────────────────────────────┬───────────────────────────────┘
+                                  ▼
+┌─────────────────────────────────────────────────────────────────┐
 │  ÉTAPE 5 — Stockage SQLite                                      │
-│  [Python] INSERT INTO strings (source_hash, source_text,        │
+│  [Rust] INSERT INTO strings (source_hash, source_text, raw_text,│
 │             context_path, event_code, row_index)                │
 │  context_path = "Map001/event_12/page_0/cmd_5"                  │
+│  → source_text contient les placeholders (prêt pour Ollama)     │
+│  → raw_text contient les codes moteur originaux (restauration)  │
 │  → permet traduction différente selon contexte (SLR pattern)   │
 └─────────────────────────────────┬───────────────────────────────┘
                                   ▼
@@ -86,17 +99,13 @@ Utilisateur ouvre un projet
 └─────────────────────────────────┬───────────────────────────────┘
                                   ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  ÉTAPE 8 — Protection des placeholders                          │
-│  [Python] utils/placeholders.py                                 │
-│  → remplacer AVANT envoi à l'IA :                               │
-│    \SE[x] → <SE_x>   (effets sonores)                           │
-│    \BGM[x] → <BGM_x> (musique)                                  │
-│    \n[x] → <NAME_x>  (noms de personnages)                      │
-│    \V[x] → <VAR_x>   (variables)                                │
-│    \C[x] → <COLOR_x> (couleurs)                                 │
-│    \I[x] → <ICON_x>  (icônes)                                   │
-│    \{, \} → <SIZE_U>, <SIZE_D>                                   │
-│  → restaurer APRÈS réception de la traduction                   │
+│  ÉTAPE 8 — Protection des placeholders (déjà fait à l'étape 4.5)│
+│  [Rust] EngineFormatter (intégré dans l'extraction)              │
+│  → source_text contient déjà les placeholders :                  │
+│    \C[x] → [COLOR_x], \N[x] → [NAME_x], \V[x] → [VAR_x]      │
+│    \I[x] → [ICON_x], @x → [WOLF_VAR_x], \E → [WOLF_END]      │
+│  → pas de traitement supplémentaire nécessaire avant Ollama     │
+│  → restauration APRÈS traduction via restore_after_translation() │
 └─────────────────────────────────┬───────────────────────────────┘
                                   ▼
 ┌─────────────────────────────────────────────────────────────────┐
@@ -121,8 +130,9 @@ Utilisateur ouvre un projet
                                   ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │  ÉTAPE 11 — Restauration des placeholders                       │
-│  [Python] utils/placeholders.py restore()                       │
-│  → <SE_x> → \SE[x], <NAME_x> → \n[x], etc.                     │
+│  [Rust] EngineFormatter::restore_after_translation()             │
+│  → [COLOR_x] → \C[x], [NAME_x] → \N[x], [WOLF_END] → \E      │
+│  → utilise raw_text comme référence pour vérification            │
 │  → vérifier qu'aucun placeholder n'est perdu                    │
 └─────────────────────────────────┬───────────────────────────────┘
                                   ▼

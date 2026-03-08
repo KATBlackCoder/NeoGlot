@@ -22,16 +22,6 @@ pub struct Project {
     pub created_at: String,
 }
 
-#[derive(Deserialize)]
-pub struct NewProject {
-    pub name: String,
-    pub game_path: String,
-    pub work_path: String,
-    pub engine: String,
-    pub source_lang: String,
-    pub target_lang: String,
-    pub project_context: String,
-}
 
 #[derive(Deserialize)]
 pub struct ExtractedStringInput {
@@ -48,6 +38,7 @@ pub struct StringEntry {
     pub id: i64,
     pub source_hash: String,
     pub source_text: String,
+    pub raw_text: String,
     pub context_path: String,
     pub event_code: Option<i32>,
     pub row_index: i32,
@@ -98,29 +89,112 @@ pub fn list_projects(state: State<'_, AppState>) -> Result<Vec<Project>, String>
     Ok(projects)
 }
 
-/// Crée un nouveau projet et retourne son id
+/// Crée un nouveau projet et retourne le projet complet (avec id et created_at)
 #[tauri::command]
-pub fn create_project(p: NewProject, state: State<'_, AppState>) -> Result<i64, String> {
+pub fn create_project(
+    name: String,
+    game_path: String,
+    work_path: String,
+    engine: String,
+    source_lang: String,
+    target_lang: String,
+    project_context: String,
+    state: State<'_, AppState>,
+) -> Result<Project, String> {
     let conn = open(&state.db_path).map_err(|e| e.to_string())?;
     conn.execute(
         "INSERT INTO projects (name, game_path, work_path, engine, source_lang, target_lang, project_context)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-        params![
-            p.name, p.game_path, p.work_path, p.engine,
-            p.source_lang, p.target_lang, p.project_context
-        ],
+        params![name, game_path, work_path, engine, source_lang, target_lang, project_context],
     )
     .map_err(|e| e.to_string())?;
-    Ok(conn.last_insert_rowid())
+
+    let id = conn.last_insert_rowid();
+    conn.query_row(
+        "SELECT id, name, game_path, work_path, engine, source_lang, target_lang,
+                project_context, status, created_at
+         FROM projects WHERE id = ?1",
+        params![id],
+        |row| Ok(Project {
+            id: row.get(0)?,
+            name: row.get(1)?,
+            game_path: row.get(2)?,
+            work_path: row.get(3)?,
+            engine: row.get(4)?,
+            source_lang: row.get(5)?,
+            target_lang: row.get(6)?,
+            project_context: row.get(7)?,
+            status: row.get(8)?,
+            created_at: row.get(9)?,
+        }),
+    )
+    .map_err(|e| e.to_string())
 }
 
-/// Supprime un projet et toutes ses données (CASCADE)
+/// Supprime un projet, ses données SQLite (CASCADE) et son dossier de travail sur disque
 #[tauri::command]
 pub fn delete_project(project_id: i64, state: State<'_, AppState>) -> Result<(), String> {
     let conn = open(&state.db_path).map_err(|e| e.to_string())?;
+
+    // Récupérer le work_path avant suppression
+    let work_path: Option<String> = conn
+        .query_row(
+            "SELECT work_path FROM projects WHERE id = ?1",
+            params![project_id],
+            |r| r.get(0),
+        )
+        .ok();
+
     conn.execute("DELETE FROM projects WHERE id = ?1", params![project_id])
         .map_err(|e| e.to_string())?;
+
+    // Supprimer le dossier de travail (best-effort — pas d'erreur si absent)
+    if let Some(path) = work_path {
+        let work_dir = std::path::Path::new(&path);
+        if work_dir.exists() {
+            let _ = std::fs::remove_dir_all(work_dir);
+        }
+    }
+
     Ok(())
+}
+
+// ─── Commandes fichiers ───────────────────────────────────────────────────────
+
+#[derive(Serialize)]
+pub struct FileEntry {
+    pub id: i64,
+    pub relative_path: String,
+    pub strings_total: i64,
+    pub strings_done: i64,
+}
+
+/// Retourne la liste des fichiers d'un projet avec leur progression
+#[tauri::command]
+pub fn list_project_files(project_id: i64, state: State<'_, AppState>) -> Result<Vec<FileEntry>, String> {
+    let conn = open(&state.db_path).map_err(|e| e.to_string())?;
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, relative_path, strings_total, strings_done
+             FROM files WHERE project_id = ?1
+             ORDER BY relative_path",
+        )
+        .map_err(|e| e.to_string())?;
+
+    let entries = stmt
+        .query_map(params![project_id], |row| {
+            Ok(FileEntry {
+                id: row.get(0)?,
+                relative_path: row.get(1)?,
+                strings_total: row.get(2)?,
+                strings_done: row.get(3)?,
+            })
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+
+    Ok(entries)
 }
 
 // ─── Commandes strings ────────────────────────────────────────────────────────
@@ -189,8 +263,8 @@ pub fn get_project_strings(
 
     let mut stmt = conn
         .prepare(
-            "SELECT s.id, s.source_hash, s.source_text, s.context_path, s.event_code,
-                    s.row_index, s.translation, s.status, f.relative_path
+            "SELECT s.id, s.source_hash, s.source_text, s.raw_text, s.context_path,
+                    s.event_code, s.row_index, s.translation, s.status, f.relative_path
              FROM strings s
              JOIN files f ON s.file_id = f.id
              WHERE f.project_id = ?1 AND s.status LIKE ?2
@@ -204,12 +278,13 @@ pub fn get_project_strings(
                 id: row.get(0)?,
                 source_hash: row.get(1)?,
                 source_text: row.get(2)?,
-                context_path: row.get(3)?,
-                event_code: row.get(4)?,
-                row_index: row.get(5)?,
-                translation: row.get(6)?,
-                status: row.get(7)?,
-                file_path: row.get(8)?,
+                raw_text: row.get(3)?,
+                context_path: row.get(4)?,
+                event_code: row.get(5)?,
+                row_index: row.get(6)?,
+                translation: row.get(7)?,
+                status: row.get(8)?,
+                file_path: row.get(9)?,
             })
         })
         .map_err(|e| e.to_string())?

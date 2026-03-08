@@ -15,7 +15,7 @@ Réinjecter les traductions dans les fichiers RPG Maker MV/MZ via `rvpacker-txt-
 
 ### 1. Commande Rust — write_rpgmv
 
-Créer `src-tauri/src/commands/write.rs` :
+Implémenter dans `src-tauri/src/commands/engines/rpgmv/inject.rs` :
 
 ```rust
 use rvpacker_txt_rs_lib::{GameType, write_dir};

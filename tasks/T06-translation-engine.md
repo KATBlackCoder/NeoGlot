@@ -11,6 +11,36 @@
 
 Implémenter le pipeline de traduction batch en Rust : déduplication, protection placeholders, appels Ollama via `reqwest` (POST /api/generate, réponse complète), progression via Tauri Channel, stockage SQLite.
 
+## Décisions d'architecture (issues de l'analyse de `parsers/`)
+
+Deux concepts du répertoire `parsers/` seront intégrés dans T06 :
+
+**1. `PromptType` — catégorisation du texte**
+
+Les textes ne se traduisent pas de la même façon selon leur nature. L'IA doit adapter son instruction :
+
+| Type | Exemple | Instruction Ollama |
+|------|---------|-------------------|
+| `Character` | "Hero", "ラディア" | "Translate this character name" |
+| `Dialogue` | "Je t'attendais..." | "Translate this dialogue naturally" |
+| `Item` | "Iron Sword", "Description d'objet" | "Translate this item name/description" |
+| `Skill` | "Fireball" | "Translate this skill name" |
+| `System` | "Save", "Load", "HP" | "Translate this UI text concisely" |
+
+→ Stocker `prompt_type` dans la table `strings` (migration DB à prévoir)
+
+**2. `EngineFormatter` — protection des placeholders**
+
+Avant d'envoyer à Ollama, convertir les codes RPG Maker en placeholders neutres puis les restaurer après :
+
+```rust
+// Exemple : "\C[1]Texte\C[0]" → "__COLOR_1__Texte__COLOR_0__"
+fn prepare_for_translation(text: &str) -> String { ... }
+fn restore_after_translation(text: &str) -> String { ... }
+```
+
+Codes à protéger : `\C[n]`, `\V[n]`, `\N[n]`, `\I[n]`, `\G`, `\{`, `\}`, `\!`, `\>`, `\<`, `\.`, `\^`
+
 ---
 
 ## Étapes
