@@ -1,6 +1,6 @@
 # T01 — Installer les plugins Tauri + shadcn-vue + Tailwind
 
-**Statut** : TODO
+**Statut** : DONE
 **Dépendances** : aucune (première tâche)
 **Durée estimée** : setup complet
 
@@ -34,7 +34,7 @@ pnpm add @tauri-apps/plugin-shell \
 
 **Ne pas installer** :
 - `@tauri-apps/plugin-sql` — SQLite géré uniquement par `rusqlite` côté Rust (évite deux drivers SQLite sur le même fichier)
-- `@tauri-apps/plugin-http` — appels Ollama via `ollama-rs` côté Rust
+- `@tauri-apps/plugin-http` — appels Ollama via `reqwest` côté Rust (blocking, pas de streaming)
 
 ### 2. Ajouter les plugins Tauri (Cargo.toml)
 
@@ -54,16 +54,15 @@ tauri-plugin-process = "2"
 tauri-plugin-clipboard-manager = "2"
 
 # Logique métier (pas de Python — tout en Rust)
-ollama-rs = { version = "0.2", features = ["stream"] }
-rusqlite = { version = "0.32", features = ["bundled"] }
+# Pas de traduction temps réel — appels Ollama batch (POST /api/generate, stream: false)
+reqwest = { version = "0.13", features = ["json", "blocking"] }
+rusqlite = { version = "0.38", features = ["bundled"] }
 tokio = { version = "1", features = ["full"] }
 regex = "1"
 once_cell = "1"
 
-# Parsing RPG Maker
-rvpacker-txt-rs-lib = "11.1.2"
-rpgmad-lib = "4.0.0"
-marshal-rs = "*"
+# Parsing RPG Maker (à ajouter en T04/T05 avec les bonnes versions crates.io)
+# rvpacker-txt-rs-lib, rpgmad-lib, marshal-rs
 
 # Utilitaires
 serde = { version = "1", features = ["derive"] }
@@ -73,8 +72,9 @@ log = "^0.4"
 walkdir = "2"
 ```
 
-Retirer `tauri-plugin-http` (les appels Ollama passent par `ollama-rs`, pas par HTTP manuel).
+Retirer `tauri-plugin-http` (les appels Ollama passent par `reqwest` blocking côté Rust).
 Retirer `tauri-plugin-opener` (non utilisé dans NeoGlot).
+Ne pas utiliser `ollama-rs` — dépend de `gxhash` qui nécessite AES+SSE2 CPU.
 
 ### 3. Enregistrer les plugins dans src-tauri/src/lib.rs
 

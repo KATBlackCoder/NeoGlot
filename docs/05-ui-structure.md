@@ -235,10 +235,14 @@ Affiché au démarrage si Ollama n'est pas disponible.
 
 ```
 src/
-├── main.ts                      # createApp + VueQueryPlugin + router + mount
+├── main.ts                      # createApp + Pinia + VueQueryPlugin + router + mount
 ├── App.vue                      # <RouterView /> racine
 ├── router/
 │   └── index.ts                 # createRouter + createWebHashHistory (Tauri)
+├── stores/                      # Pinia — état client partagé entre composants
+│   ├── projectStore.ts          # currentProject (Project | null) — projet ouvert
+│   ├── translationStore.ts      # isRunning, progress, percentage — job en cours
+│   └── index.ts                 # barrel export
 ├── components/
 │   ├── AppShell.vue             # Layout : AppSidebar + <main> + <RouterView>
 │   ├── AppSidebar.vue           # Navigation latérale (shadcn-vue Sidebar)
@@ -250,12 +254,12 @@ src/
 │   ├── TranslateView.vue
 │   ├── GlossaryView.vue
 │   └── SettingsView.vue
-├── composables/                 # Logique réactive partagée (= hooks React)
+├── composables/                 # Logique réactive + TanStack Vue Query (state serveur)
 │   ├── useOllama.ts             # check_ollama + list_ollama_models
-│   ├── useProjects.ts           # list_projects, create_project, delete_project
-│   ├── useTranslation.ts        # start_translation via Channel<TranslationProgress>
+│   ├── useProjects.ts           # list_projects, create_project, delete_project, useOpenProject
+│   ├── useTranslation.ts        # start_translation via Channel → met à jour translationStore
 │   ├── useGlossary.ts           # list_glossary, add/update/delete term
-│   └── useStore.ts              # tauri-plugin-store prefs
+│   └── useStore.ts              # tauri-plugin-store prefs (settings persistés)
 ├── lib/
 │   └── utils.ts                 # cn() helper Tailwind + utilitaires
 └── types/
@@ -263,3 +267,12 @@ src/
     ├── string.ts
     └── glossary.ts
 ```
+
+### Séparation des responsabilités d'état
+
+| Besoin | Outil | Exemple |
+|--------|-------|---------|
+| Données serveur (invoke) | TanStack Vue Query | `useProjects()`, `useProjectProgress()` |
+| État UI partagé cross-composants | Pinia | `useProjectStore`, `useTranslationStore` |
+| Settings persistés sur disque | `useStore.ts` + LazyStore | URL Ollama, modèle, tokens/batch |
+| État local à un composant | `shallowRef` / `ref` | Dialog ouvert/fermé, valeur input |

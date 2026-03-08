@@ -5,71 +5,58 @@
 
 ---
 
-## 1. ollama-rs — Client Ollama pour Rust
+## 1. reqwest — Client HTTP Rust pour Ollama
 
-**Source** : https://github.com/pepperoni21/ollama-rs | **Licence** : MIT
-**Version** : 0.2.x | **Cargo** : `ollama-rs = { version = "0.2", features = ["stream"] }`
+**Source** : https://github.com/seanmonstar/reqwest | **Licence** : MIT/Apache-2.0
+**Version** : 0.11 | **Cargo** : `reqwest = { version = "0.13", features = ["json", "blocking"] }`
 
-### Pourquoi adopter
+### Pourquoi pas ollama-rs
 
-Remplace tout appel HTTP manuel vers Ollama. Client officiel communautaire, bien maintenu, API ergonomique.
+`ollama-rs` dépend de `gxhash` qui nécessite les instructions CPU **AES+SSE2** et refuse de compiler sans `RUSTFLAGS="-C target-cpu=native"`. Incompatible avec une build reproductible.
 
-### API clé
+De plus, NeoGlot ne fait **pas de traduction temps réel** (pas de streaming token par token). L'appel Ollama est simple : `POST /api/generate` avec `"stream": false`, on attend la réponse complète. `reqwest` suffit amplement.
 
-```rust
-use ollama_rs::{
-    Ollama,
-    generation::completion::request::GenerationRequest,
-    generation::options::ModelOptions,
-};
-
-// Connexion par défaut : localhost:11434
-let ollama = Ollama::default();
-
-// Vérification disponibilité
-let models = ollama.list_local_models().await?;
-let available = !models.is_empty();
-
-// Génération simple
-let request = GenerationRequest::new("llama3:8b".into(), prompt)
-    .options(ModelOptions::default().temperature(0.3));
-let response = ollama.generate(request).await?;
-let text = response.response; // String
-
-// Liste des modèles disponibles
-let model_names: Vec<String> = ollama.list_local_models().await?
-    .into_iter()
-    .map(|m| m.name)
-    .collect();
-```
-
-### Usage dans NeoGlot (translate.rs)
+### API clé (appels Ollama)
 
 ```rust
-// Vérifier Ollama au démarrage
-#[tauri::command]
-pub async fn check_ollama() -> bool {
-    Ollama::default().list_local_models().await.is_ok()
+use reqwest::blocking::Client;
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize)]
+struct OllamaRequest<'a> {
+    model: &'a str,
+    prompt: &'a str,
+    stream: bool,
 }
 
-// Lister les modèles disponibles
-#[tauri::command]
-pub async fn list_ollama_models() -> Result<Vec<String>, String> {
-    let models = Ollama::default()
-        .list_local_models().await
-        .map_err(|e| e.to_string())?;
-    Ok(models.into_iter().map(|m| m.name).collect())
+#[derive(Deserialize)]
+struct OllamaResponse {
+    response: String,
 }
+
+// Appel batch — attend la réponse complète
+let client = Client::new();
+let resp: OllamaResponse = client
+    .post("http://localhost:11434/api/generate")
+    .json(&OllamaRequest { model: "llama3:8b", prompt: &prompt, stream: false })
+    .send()?
+    .json()?;
+let translation = resp.response;
+
+// Vérifier disponibilité Ollama
+let ok = client.get("http://localhost:11434/api/tags").send()
+    .map(|r| r.status().is_success())
+    .unwrap_or(false);
 ```
 
-**Décision** : Adopter. Remplace tout code HTTP manuel vers Ollama.
+**Décision** : Adopter. Remplace `ollama-rs` — plus simple, aucun problème de compilation CPU.
 
 ---
 
 ## 2. rusqlite — SQLite natif pour Rust
 
 **Source** : https://github.com/rusqlite/rusqlite | **Licence** : MIT
-**Version** : 0.32 | **Cargo** : `rusqlite = { version = "0.32", features = ["bundled"] }`
+**Version** : 0.32 | **Cargo** : `rusqlite = { version = "0.38", features = ["bundled"] }`
 
 ### Pourquoi `features = ["bundled"]`
 
@@ -142,13 +129,13 @@ pub async fn start_translation(
     on_progress: Channel<TranslationProgress>,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    // Les appels ollama-rs sont async et tournent sur le runtime tokio de Tauri
-    let ollama = Ollama::default();
+    // Les appels reqwest blocking tournent dans un thread dédié (spawn_blocking)
+    let client = reqwest::blocking::Client::new();
     // ...
 }
 ```
 
-**Décision** : Adopter. Requis pour ollama-rs et les commandes async.
+**Décision** : Adopter. Requis pour les commandes async Tauri (reqwest blocking s'exécute via `spawn_blocking`).
 
 ---
 
@@ -212,8 +199,8 @@ tauri-plugin-process = "2"
 tauri-plugin-clipboard-manager = "2"
 
 # Logique métier
-ollama-rs = { version = "0.2", features = ["stream"] }
-rusqlite = { version = "0.32", features = ["bundled"] }
+reqwest = { version = "0.13", features = ["json", "blocking"] }
+rusqlite = { version = "0.38", features = ["bundled"] }
 tokio = { version = "1", features = ["full"] }
 regex = "1"
 once_cell = "1"

@@ -1,13 +1,13 @@
 # T02 — App Shell, Routing et Layout
 
-**Statut** : TODO
+**Statut** : DONE
 **Dépendances** : T01 (shadcn-vue + plugins installés)
 
 ---
 
 ## Objectif
 
-Mettre en place la structure Vue 3 de base : App Shell avec sidebar, Vue Router, VueQueryPlugin, thème sombre.
+Mettre en place la structure Vue 3 de base : App Shell avec sidebar, Vue Router, Pinia, VueQueryPlugin, thème sombre.
 Tout en SFCs `.vue` avec `<script setup lang="ts">`.
 
 ---
@@ -46,9 +46,13 @@ src/
 │   ├── TranslateView.vue
 │   ├── GlossaryView.vue
 │   └── SettingsView.vue
-├── composables/             (logique réactive — équivalent hooks React)
+├── composables/             (logique réactive + Vue Query)
 │   ├── useOllama.ts
 │   └── useStore.ts
+├── stores/                  (Pinia — état client partagé)
+│   ├── projectStore.ts      (projet ouvert : currentProject)
+│   ├── translationStore.ts  (job en cours : isRunning, progress)
+│   └── index.ts             (barrel export)
 ├── router/
 │   └── index.ts
 ├── lib/
@@ -214,12 +218,14 @@ import { SidebarProvider } from '@/components/ui/sidebar';
 
 ```typescript
 import { createApp } from 'vue';
+import { createPinia } from 'pinia';
 import { VueQueryPlugin } from '@tanstack/vue-query';
 import App from './App.vue';
 import router from './router';
 import './style.css';
 
 const app = createApp(App);
+app.use(createPinia()); // Pinia avant router (stores accessibles dans les navigation guards)
 app.use(router);
 app.use(VueQueryPlugin);
 app.mount('#app');
@@ -264,14 +270,23 @@ const showOllamaModal = computed(() => isError.value || isOnline.value === false
 
 ## Fichiers créés/modifiés
 
-- `src/main.ts` — VueQueryPlugin + router + mount
+- `src/main.ts` — Pinia + VueQueryPlugin + router + mount
 - `src/App.vue` — `<RouterView />` racine
 - `src/router/index.ts` — routes avec `createWebHashHistory`
 - `src/types/project.ts` / `glossary.ts` — types TypeScript
 - `src/composables/useOllama.ts` — status Ollama via `invoke('check_ollama')`
+- `src/composables/useStore.ts` — settings persistés via `LazyStore`
+- `src/stores/projectStore.ts` — store Pinia projet ouvert
+- `src/stores/translationStore.ts` — store Pinia job de traduction
+- `src/stores/index.ts` — barrel export
 - `src/components/OllamaStatus.vue` — badge status
 - `src/components/AppSidebar.vue` — navigation
 - `src/components/AppShell.vue` — layout
+- `src/views/HomeView.vue` — accueil + modal Ollama bloquant
+- `src/views/ProjectsView.vue` — scaffold liste projets
+- `src/views/TranslateView.vue` — scaffold ResizablePanelGroup
+- `src/views/GlossaryView.vue` — scaffold Table
+- `src/views/SettingsView.vue` — config Ollama + tokens/batch
 
 ---
 

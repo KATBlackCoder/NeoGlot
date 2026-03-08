@@ -13,9 +13,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | UI | Vue 3 + TypeScript + Vite (`<script setup lang="ts">`) |
 | Desktop | Tauri v2 (Rust backend) |
 | UI components | shadcn-vue + Tailwind CSS v4 |
+| State management | Pinia (client state) + TanStack Vue Query (server state via `invoke()`) |
 | Logic backend | Rust (Tauri commands) — parsing, SQLite, Ollama HTTP, sous-processus |
-| AI | Ollama only (`localhost:11434`) via `ollama-rs` — no cloud APIs |
+| AI | Ollama only (`localhost:11434`) via `reqwest` (HTTP batch, no streaming) — no cloud APIs |
 | Database | SQLite via `rusqlite` (Rust, bundled) — PAS de `tauri-plugin-sql` |
+
+**State management split:**
+- **Pinia** (`src/stores/`) → état client partagé entre composants : projet ouvert (`useProjectStore`), job de traduction en cours (`useTranslationStore`)
+- **TanStack Vue Query** → état serveur : données venant de `invoke()` (liste projets, strings, glossaire) avec cache et invalidation
+- **`useStore.ts`** → settings persistés via `tauri-plugin-store`
 
 **Ollama is a hard requirement.** Verify at startup on `localhost:11434`. If not running, show a clear error with install link. No fallback to other AI services.
 
@@ -34,12 +40,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 docs/          # Planning documents (architecture, DB schema, workflow, UI)
 tasks/         # Ordered task backlog (T01 to T10)
 reviews/       # Analysis of reference projects (00-SYNTHESE.md = master synthesis)
-src/           # Vue 3 frontend
+src/
+├── components/    # Vue components (AppShell, AppSidebar, OllamaStatus + ui/)
+├── composables/   # Logique réactive : useOllama, useStore, useProjects...
+├── stores/        # Pinia stores : projectStore, translationStore
+├── views/         # Pages Vue Router (HomeView, ProjectsView...)
+├── router/        # Vue Router (createWebHashHistory)
+├── types/         # TypeScript interfaces (Project, GlossaryEntry...)
+└── lib/           # Utilitaires (cn() Tailwind)
 src-tauri/     # Rust/Tauri backend (parsing, SQLite, Ollama, Wolf RPG)
 ```
 
 ## Key Documents
 
+- `docs/PROGRESS.md` — **état d'avancement par tâche** (lire en premier)
+- `docs/CHANGELOG.md` — historique des changements par version
 - `docs/01-architecture.md` — full system architecture
 - `docs/02-database-schema.md` — SQLite schema (6 tables)
 - `docs/03-translation-workflow.md` — 13-step translation pipeline
@@ -70,7 +85,7 @@ pnpm tauri build
 
 This project has agent skills pre-installed in `.agents/skills/`:
 - `tauri-v2` — Tauri v2 IPC patterns, capabilities, Rust commands
-- `vercel-react-best-practices` — React/performance best practices
+- `vue-best-practices` — Vue 3 Composition API, composables, reactivity patterns
 - `shadcn` — shadcn/ui component usage
 
 Use the relevant skill when working on those layers.

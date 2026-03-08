@@ -1,10 +1,23 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Capability for the main window",
+  "description": "Permissions NeoGlot",
   "windows": ["main"],
   "permissions": [
     "core:default",
-    "opener:default"
+    "shell:allow-execute",
+    "shell:allow-spawn",
+    "shell:allow-kill",
+    "fs:read-all",
+    "fs:write-all",
+    "fs:allow-exists",
+    "fs:allow-mkdir",
+    "fs:allow-copy-file",
+    "dialog:default",
+    "store:default",
+    "window-state:default",
+    "notification:default",
+    "process:default",
+    "clipboard-manager:default"
   ]
 }

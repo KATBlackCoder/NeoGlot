@@ -89,7 +89,7 @@ Commandes disponibles :
 - Afficher la liste des projets via `useProjects()` composable (TanStack Vue Query)
 - Afficher pour chaque projet : nom, moteur, barre de progression via `useProjectProgress(id)`
 - Bouton "Nouveau projet" → ouvre un `Dialog`
-- Bouton "Ouvrir" → `router.push('/projects/:id/translate')`
+- Bouton "Ouvrir" → `useOpenProject()(project)` → stocke dans `useProjectStore` + navigue vers `/projects/:id/translate`
 - Bouton "Supprimer" → `AlertDialog` de confirmation → `useDeleteProject().mutate(id)`
 
 ### 4. Dialog — Nouveau projet (dans ProjectsView.vue)
@@ -139,7 +139,9 @@ async function handleCreate(formData: NewProjectForm) {
 ```typescript
 import { invoke } from '@tauri-apps/api/core';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query';
+import { useRouter } from 'vue-router';
 import type { Project } from '@/types/project';
+import { useProjectStore } from '@/stores';
 
 export function useProjects() {
   return useQuery({
@@ -154,6 +156,17 @@ export function useDeleteProject() {
     mutationFn: (id: number) => invoke('delete_project', { projectId: id }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['projects'] }),
   });
+}
+
+// Ouvre un projet : stocke dans Pinia + navigue vers /translate
+export function useOpenProject() {
+  const router = useRouter();
+  const projectStore = useProjectStore();
+
+  return (project: Project) => {
+    projectStore.setProject(project);
+    router.push(`/projects/${project.id}/translate`);
+  };
 }
 ```
 

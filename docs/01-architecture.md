@@ -12,7 +12,7 @@
 └──────────────────────────┬──────────────────────────────────┘
                            │
                      invoke() IPC
-                     (Tauri Channel pour streaming)
+                     (invoke() IPC — traduction batch, pas temps réel)
                            │
           ┌────────────────▼────────────────────────────────┐
           │              Rust / Tauri                        │
@@ -37,7 +37,7 @@
           │                                                  │
           │  crates:                                         │
           │    rusqlite          ← SQLite natif              │
-          │    ollama-rs         ← HTTP Ollama :11434        │
+          │    reqwest           ← HTTP batch Ollama :11434   │
           │    rvpacker-txt-rs-lib ← RPG Maker MV/MZ/XP/VX  │
           │    rpgmad-lib        ← déchiffrement .rgss       │
           │    regex             ← protection placeholders   │
@@ -57,11 +57,26 @@
 
 - **Framework** : Vue 3 + TypeScript + Vite — Composition API, `<script setup lang="ts">`, SFCs `.vue`
 - **UI** : shadcn-vue (Reka UI) + Tailwind CSS v4, thème sombre
-- **État** : `ref`/`reactive`/`computed` + TanStack Vue Query (queryFn via `invoke()`)
 - **Navigation** : Vue Router v4 (`createWebHashHistory` — requis Tauri, pas de serveur)
-- **Composables** : `useProjects`, `useOllama`, `useTranslation`, `useGlossary` dans `src/composables/`
 - **IPC** : `invoke()` pour toutes les opérations (pas d'HTTP vers un backend séparé)
-- **Streaming** : `new Channel<TranslationProgress>()` depuis `@tauri-apps/api/core` pour la progression des traductions
+- **Progression** : `new Channel<TranslationProgress>()` depuis `@tauri-apps/api/core` pour suivre l'avancement de la traduction batch (texte par texte, pas streaming token)
+
+#### Gestion d'état — 3 couches distinctes
+
+| Couche | Outil | Dossier | Rôle |
+|--------|-------|---------|------|
+| État client partagé | **Pinia** | `src/stores/` | Projet ouvert, job de traduction en cours — accessible partout sans prop-drilling |
+| État serveur | **TanStack Vue Query** | `src/composables/use*.ts` | Données de `invoke()` (projets, strings, glossaire) avec cache + invalidation automatique |
+| Settings persistés | **`useStore.ts`** + `tauri-plugin-store` | `src/composables/` | Préférences utilisateur (URL Ollama, modèle, tokens/batch) |
+
+**Stores Pinia :**
+- `useProjectStore` — projet actuellement ouvert (`currentProject: Project | null`) — évite de passer l'id/objet projet entre TranslateView, GlossaryView, AppSidebar
+- `useTranslationStore` — état du job en cours (`isRunning`, `progress`, `percentage`) — mis à jour par les events du Channel Tauri
+
+**Composables Vue Query :**
+- `useOllamaStatus()` / `useOllamaModels()` — dans `src/composables/useOllama.ts`
+- `useProjects()` / `useDeleteProject()` / `useProjectProgress(id)` — dans `src/composables/useProjects.ts`
+- `useTranslation(projectId)` — dans `src/composables/useTranslation.ts` (T06)
 
 ### Backend Rust — src-tauri/
 
@@ -74,7 +89,7 @@ Responsabilités : **tout** — parsing, SQLite, Ollama, Wolf RPG, glossaire, ca
 | `commands/parse.rs` | Extraction textes RPG Maker MV/MZ/XP/VX | `rvpacker-txt-rs-lib` |
 | `commands/write.rs` | Réinjection traductions RPG Maker | `rvpacker-txt-rs-lib` |
 | `commands/decrypt.rs` | Déchiffrement .rgss (RPG Maker XP/VX) | `rpgmad-lib` |
-| `commands/translate.rs` | Pipeline traduction Ollama + cache + Channel | `ollama-rs`, `rusqlite`, `regex` |
+| `commands/translate.rs` | Pipeline traduction Ollama batch + cache + Channel progression | `reqwest`, `rusqlite`, `regex` |
 | `commands/glossary.rs` | CRUD glossaire + QC post-traduction | `rusqlite` |
 | `commands/wolf.rs` | Extraction/réinjection Wolf RPG | `std::process::Command` |
 | `db.rs` | Init SQLite, schéma, WAL mode | `rusqlite` |
@@ -94,7 +109,7 @@ Injecté via `tauri::State<'_, AppState>` dans chaque commande qui en a besoin.
 
 Fichier unique : `~/.local/share/neoglot/neoglot.db` (Linux) / `%APPDATA%\neoglot\neoglot.db` (Windows).
 
-Géré par `rusqlite` côté Rust (écriture/logique) et `tauri-plugin-sql` côté frontend (lectures).
+Géré exclusivement par `rusqlite` côté Rust — toutes les lectures/écritures passent par `invoke()`. Pas de `tauri-plugin-sql`.
 
 Voir `docs/02-database-schema.md` pour le schéma complet.
 
@@ -141,10 +156,10 @@ await invoke('store_strings', { projectId: 1, strings });
 // Détection moteur
 const engine = await invoke<string>('detect_engine', { gamePath: '/path/to/game' });
 
-// Traduction avec streaming via Channel
+// Traduction batch — Channel pour la progression (1 event par texte traduit, pas streaming token)
 import { Channel } from '@tauri-apps/api/core';
 const channel = new Channel<TranslationProgress>();
-channel.onmessage = (event) => { setProgress(event); };
+channel.onmessage = (event) => { setProgress(event); };  // done/total
 await invoke('start_translation', { projectId: 1, model: 'llama3:8b', onProgress: channel });
 await invoke('cancel_translation');
 

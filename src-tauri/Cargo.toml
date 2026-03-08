@@ -1,16 +1,12 @@
 [package]
 name = "neoglot"
 version = "0.1.0"
-description = "A Tauri App"
+description = "NeoGlot — traduction de jeux RPG open source"
 authors = ["you"]
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [lib]
-# The `_lib` suffix may seem redundant but it is necessary
-# to make the lib name unique and wouldn't conflict with the bin name.
-# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
+# Le suffixe _lib évite les conflits de noms sur Windows
 name = "neoglot_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
@@ -19,7 +15,37 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 tauri = { version = "2", features = [] }
-tauri-plugin-opener = "2"
+
+# Plugins Tauri
+tauri-plugin-shell = "2"
+tauri-plugin-fs = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-store = "2"
+tauri-plugin-log = "2"
+tauri-plugin-window-state = "2"
+tauri-plugin-notification = "2"
+tauri-plugin-process = "2"
+tauri-plugin-clipboard-manager = "2"
+
+# Sérialisation
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
+# Base de données SQLite (bundled — pas de tauri-plugin-sql)
+rusqlite = { version = "0.38", features = ["bundled"] }
+
+# IA locale — appels HTTP batch à Ollama (localhost:11434)
+reqwest = { version = "0.13", features = ["json", "blocking"] }
+
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# Parsing RPG Maker (sera ajouté aux tâches T04/T05)
+# rvpacker-txt-rs-lib, rpgmad-lib, marshal-rs
+
+# Utilitaires
+sha2 = "0.10"
+walkdir = "2"
+regex = "1"
+once_cell = "1"
+log = "^0.4"

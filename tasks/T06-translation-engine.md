@@ -1,15 +1,15 @@
-# T06 — Moteur de Traduction (ollama-rs + Tauri Channel)
+# T06 — Moteur de Traduction (reqwest + Tauri Channel progression)
 
 **Statut** : TODO
 **Dépendances** : T05 (strings extraits en SQLite), T03 (AppState + DB prêt)
 
-> Pas de Python, pas de SSE HTTP. Tout passe par `invoke()` avec un **Tauri Channel** pour le streaming natif Rust → Frontend.
+> Pas de Python, pas de SSE HTTP, pas de traduction temps réel. Tout passe par `invoke()`. Le **Tauri Channel** sert uniquement à reporter la progression (1 event par texte traduit), pas à streamer des tokens.
 
 ---
 
 ## Objectif
 
-Implémenter le pipeline de traduction complet en Rust : déduplication, protection placeholders, batching tokens, appels Ollama via `ollama-rs`, streaming progression via Tauri Channel, stockage SQLite.
+Implémenter le pipeline de traduction batch en Rust : déduplication, protection placeholders, appels Ollama via `reqwest` (POST /api/generate, réponse complète), progression via Tauri Channel, stockage SQLite.
 
 ---
 
@@ -18,8 +18,7 @@ Implémenter le pipeline de traduction complet en Rust : déduplication, protect
 ### 1. Créer src-tauri/src/commands/translate.rs
 
 ```rust
-use ollama_rs::{Ollama, generation::completion::request::GenerationRequest};
-use ollama_rs::models::ModelOptions;
+use reqwest::blocking::Client;
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use sha2::{Sha256, Digest};
@@ -45,19 +44,29 @@ struct GlossaryTerm {
 
 // ─── Commandes publiques ───────────────────────────────────────────────────────
 
-/// Vérifier si Ollama est disponible
+/// Vérifier si Ollama est disponible (GET /api/tags)
 #[tauri::command]
-pub async fn check_ollama() -> bool {
-    Ollama::default().list_local_models().await.is_ok()
+pub fn check_ollama() -> bool {
+    Client::new()
+        .get("http://localhost:11434/api/tags")
+        .send()
+        .map(|r| r.status().is_success())
+        .unwrap_or(false)
 }
 
 /// Lister les modèles Ollama installés
 #[tauri::command]
-pub async fn list_ollama_models() -> Result<Vec<String>, String> {
-    let models = Ollama::default()
-        .list_local_models().await
-        .map_err(|e| e.to_string())?;
-    Ok(models.into_iter().map(|m| m.name).collect())
+pub fn list_ollama_models() -> Result<Vec<String>, String> {
+    #[derive(Deserialize)]
+    struct TagsResponse { models: Vec<OllamaModel> }
+    #[derive(Deserialize)]
+    struct OllamaModel { name: String }
+
+    let resp: TagsResponse = Client::new()
+        .get("http://localhost:11434/api/tags")
+        .send().map_err(|e| e.to_string())?
+        .json().map_err(|e| e.to_string())?;
+    Ok(resp.models.into_iter().map(|m| m.name).collect())
 }
 
 /// Démarrer la traduction d'un projet (avec streaming via Channel)
@@ -410,53 +419,50 @@ fn batch_by_tokens(texts: &[String], max_tokens: usize) -> Vec<Vec<String>> {
 
 ### 2. Frontend — src/composables/useTranslation.ts
 
+Le composable délègue l'état (`isRunning`, `progress`) au store Pinia `useTranslationStore`, accessible globalement sans prop-drilling.
+
 ```typescript
-import { ref } from 'vue';
 import { invoke, Channel } from '@tauri-apps/api/core';
 import { sendNotification } from '@tauri-apps/plugin-notification';
-
-interface TranslationProgress {
-  done: number;
-  total: number;
-  last_translation: string;
-  status: 'running' | 'done' | 'cancelled' | 'error';
-}
+import { useTranslationStore, type TranslationProgress } from '@/stores';
+import { useQueryClient } from '@tanstack/vue-query';
 
 export function useTranslation(projectId: number) {
-  const progress = ref<TranslationProgress>({
-    done: 0, total: 0, last_translation: '', status: 'running',
-  });
-  const isRunning = ref(false);
+  const translationStore = useTranslationStore();
+  const qc = useQueryClient();
 
   const start = async (model: string) => {
-    isRunning.value = true;
+    translationStore.start();
 
-    // Tauri Channel — streaming natif Rust → Vue
+    // Tauri Channel — progression Rust → Vue (1 event par texte traduit)
     const channel = new Channel<TranslationProgress>();
     channel.onmessage = (event) => {
-      progress.value = event;
+      translationStore.updateProgress(event);
+
       if (event.status === 'done') {
-        isRunning.value = false;
         sendNotification({
           title: 'NeoGlot — Traduction terminée',
           body: `${event.total} textes traduits`,
         });
-      }
-      if (event.status === 'cancelled' || event.status === 'error') {
-        isRunning.value = false;
+        // Invalider le cache Vue Query pour rafraîchir la liste et la progression
+        qc.invalidateQueries({ queryKey: ['project-progress', projectId] });
+        qc.invalidateQueries({ queryKey: ['project-strings', projectId] });
       }
     };
 
     try {
       await invoke('start_translation', { projectId, model, onProgress: channel });
     } catch {
-      isRunning.value = false;
+      translationStore.stop();
     }
   };
 
-  const cancel = () => invoke('cancel_translation');
+  const cancel = async () => {
+    await invoke('cancel_translation');
+    translationStore.stop();
+  };
 
-  return { start, cancel, progress, isRunning };
+  return { start, cancel };
 }
 ```
 
