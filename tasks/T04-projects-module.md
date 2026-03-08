@@ -1,6 +1,6 @@
 # T04 — Module Projets (CRUD + détection moteur)
 
-**Statut** : TODO
+**Statut** : DONE
 **Dépendances** : T02 (App Shell), T03 (commandes Rust db_commands)
 
 ---

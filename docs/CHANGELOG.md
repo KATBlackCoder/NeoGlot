@@ -7,6 +7,19 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 ## [Unreleased]
 
+### Added — T04 : Module Projets (CRUD + détection moteur)
+
+**Frontend**
+- `src/composables/useProjects.ts` — `useProjects()`, `useDeleteProject()`, `useOpenProject()`, `useProjectProgress()`, `ENGINE_LABELS`
+- `src/components/projects/ProjectCard.vue` — carte projet avec barre de progression et `AlertDialog` suppression
+- `src/components/projects/ProjectList.vue` — skeletons + état vide + liste
+- `src/components/projects/NewProjectDialog.vue` — formulaire création : sélection dossier, détection moteur automatique, select langues, création + navigation
+
+**Modified**
+- `src/views/ProjectsView.vue` — rewrote complet, view mince orchestre composable + composants
+
+---
+
 ### Added — Préparation T09 : Binaires Wolf RPG
 
 - `src-tauri/resources/WolfTL.exe` — outil d'extraction/réinjection Wolf RPG (placé manuellement)

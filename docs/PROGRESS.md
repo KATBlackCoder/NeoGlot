@@ -2,7 +2,7 @@
 
 Suivi de l'avancement par tâche. Mis à jour à chaque complétion de tâche.
 
-**Dernière mise à jour** : 2026-03-08
+**Dernière mise à jour** : 2026-03-08 (T04)
 
 ---
 
@@ -12,7 +12,7 @@ Suivi de l'avancement par tâche. Mis à jour à chaque complétion de tâche.
 T01 ██████████ DONE
 T02 ██████████ DONE
 T03 ██████████ DONE
-T04 ░░░░░░░░░░ TODO  (dépend T02, T03)
+T04 ██████████ DONE
 T05 ░░░░░░░░░░ TODO  (dépend T04)
 T06 ░░░░░░░░░░ TODO  (dépend T05, T03)
 T07 ░░░░░░░░░░ TODO  (dépend T06)
@@ -21,7 +21,7 @@ T09 ░░░░░░░░░░ TODO  (dépend T04, T06)
 T10 ░░░░░░░░░░ TODO  (dépend T05, T07)
 ```
 
-**Progression globale : 3 / 10 tâches** (30%)
+**Progression globale : 4 / 10 tâches** (40%)
 
 ---
 
@@ -98,14 +98,20 @@ T10 ░░░░░░░░░░ TODO  (dépend T05, T07)
 
 ---
 
-### ⏳ T04 — Module Projets (CRUD + détection moteur)
+### ✅ T04 — Module Projets (CRUD + détection moteur)
 
-**Statut** : TODO — _Prochaine étape_ (dépend T02 ✅, T03 ✅)
+**Statut** : DONE
 
-**À faire :**
-- Rust : `commands/detect.rs` → `detect_engine()` (détection par fichiers marqueurs)
-- Vue : implémenter `ProjectsView.vue` avec `useProjects()` + dialog création + `useOpenProject()`
-- Composable `useProjects.ts` : `useProjects()`, `useDeleteProject()`, `useProjectProgress(id)`, `useOpenProject()`
+**Ce qui a été fait :**
+- `src/composables/useProjects.ts` — `useProjects()` (TanStack Query), `useDeleteProject()` (mutation + invalidation), `useOpenProject()` (Pinia + router), `useProjectProgress(id)` (polling 5s) + `ENGINE_LABELS`
+- `src/components/projects/ProjectCard.vue` — carte projet : nom, badge moteur, badge statut, barre de progression, boutons Ouvrir/Supprimer avec `AlertDialog` de confirmation
+- `src/components/projects/ProjectList.vue` — skeletons de chargement, état vide, liste de `ProjectCard`
+- `src/components/projects/NewProjectDialog.vue` — formulaire complet : sélection dossier via `tauri-plugin-dialog`, détection moteur automatique via `detect_engine`, select langues, contexte optionnel, création via `create_project` + navigation immédiate
+- `src/views/ProjectsView.vue` — view fine : orchestre composable + composants, ouvre le dialog
+
+**Fichiers créés :** `src/composables/useProjects.ts`, `src/components/projects/ProjectCard.vue`, `src/components/projects/ProjectList.vue`, `src/components/projects/NewProjectDialog.vue`
+
+**Fichiers modifiés :** `src/views/ProjectsView.vue`
 
 ---
 
