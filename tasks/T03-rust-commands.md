@@ -1,6 +1,6 @@
 # T03 — Scaffold Rust Commands (DB + State)
 
-**Statut** : TODO
+**Statut** : DONE
 **Dépendances** : T01 (Cargo.toml prêt)
 
 > Python supprimé. Toute la logique métier est en Rust. Le frontend parle uniquement via `invoke()`.

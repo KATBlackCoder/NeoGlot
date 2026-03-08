@@ -11,7 +11,7 @@ Suivi de l'avancement par tâche. Mis à jour à chaque complétion de tâche.
 ```
 T01 ██████████ DONE
 T02 ██████████ DONE
-T03 ░░░░░░░░░░ TODO
+T03 ██████████ DONE
 T04 ░░░░░░░░░░ TODO  (dépend T02, T03)
 T05 ░░░░░░░░░░ TODO  (dépend T04)
 T06 ░░░░░░░░░░ TODO  (dépend T05, T03)
@@ -21,7 +21,7 @@ T09 ░░░░░░░░░░ TODO  (dépend T04, T06)
 T10 ░░░░░░░░░░ TODO  (dépend T05, T07)
 ```
 
-**Progression globale : 2 / 10 tâches** (20%)
+**Progression globale : 3 / 10 tâches** (30%)
 
 ---
 
@@ -75,21 +75,32 @@ T10 ░░░░░░░░░░ TODO  (dépend T05, T07)
 
 ---
 
-### ⏳ T03 — Scaffold Rust Commands (DB + State)
+### ✅ T03 — Scaffold Rust Commands (DB + State)
 
-**Statut** : TODO — _Prochaine étape_
+**Statut** : DONE
 
-**À faire :**
-- Créer `src-tauri/src/db.rs` : `get_db_path()`, `open()`, `init_schema()` — 6 tables + WAL mode
-- Créer `AppState` : `db_path: PathBuf`, `translation_running: Mutex<bool>`
-- Créer `src-tauri/src/commands/db_commands.rs` : `list_projects`, `create_project`, `delete_project`, `store_strings`, `get_project_strings`, `get_project_progress`
-- Mettre à jour `lib.rs` : brancher tous les plugins + `generate_handler![]`
+**Ce qui a été fait :**
+- `src-tauri/src/db.rs` — `get_db_path()` (Linux + Windows), `open()` (WAL + FK), `init_schema()` (6 tables + 3 index)
+- `src-tauri/src/lib.rs` — `AppState { db_path, translation_running: Mutex<bool> }` + tous les plugins branchés + `generate_handler![]` complet
+- `src-tauri/src/commands/mod.rs` — déclaration des 8 modules
+- `src-tauri/src/commands/db_commands.rs` — CRUD complet : `list_projects`, `create_project`, `delete_project`, `store_strings`, `get_project_strings`, `get_project_progress`
+- `src-tauri/src/commands/translate.rs` — `check_ollama()` et `list_ollama_models()` fonctionnels via `reqwest` blocking ; `start_translation` / `cancel_translation` stubs
+- `src-tauri/src/commands/detect.rs` — `detect_engine()` implémenté (fichiers marqueurs, 6 moteurs)
+- Stubs compilants : `parse.rs`, `write.rs`, `decrypt.rs`, `glossary.rs`, `wolf.rs`
+- `dirs = "5"` ajouté dans `Cargo.toml`
+- **`cargo check` : 0 erreur, 1 warning inoffensif** (champs stub non utilisés)
+
+**Commandes disponibles dès T03 :**
+- `check_ollama` → `bool` — utilisé par `useOllamaStatus()` (HomeView)
+- `list_ollama_models` → `Vec<String>` — utilisé par SettingsView
+- `list_projects` / `create_project` / `delete_project` / `get_project_progress` / `store_strings` / `get_project_strings`
+- `detect_engine` — prête pour T04
 
 ---
 
 ### ⏳ T04 — Module Projets (CRUD + détection moteur)
 
-**Statut** : TODO — _dépend T02, T03_
+**Statut** : TODO — _Prochaine étape_ (dépend T02 ✅, T03 ✅)
 
 **À faire :**
 - Rust : `commands/detect.rs` → `detect_engine()` (détection par fichiers marqueurs)

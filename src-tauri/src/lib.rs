@@ -1,8 +1,30 @@
-// Point d'entrée de la bibliothèque Tauri — enregistrement des plugins et des commandes
+// Point d'entrée de la bibliothèque Tauri
+// Initialise DB, AppState, plugins et enregistre toutes les commandes
+mod db;
+mod commands;
+
+use std::sync::Mutex;
+
+/// État global partagé entre toutes les commandes Tauri via State<'_, AppState>
+pub struct AppState {
+    /// Chemin vers neoglot.db (calculé une fois au démarrage)
+    pub db_path: std::path::PathBuf,
+    /// Flag d'annulation de la traduction en cours (T06)
+    pub translation_running: Mutex<bool>,
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Initialiser la DB avant de démarrer Tauri
+    let db_path = db::get_db_path();
+    db::init_schema(&db_path).expect("Erreur initialisation schéma SQLite");
+
     tauri::Builder::default()
-        // Logging vers fichier + stdout + webview
+        .manage(AppState {
+            db_path,
+            translation_running: Mutex::new(false),
+        })
+        // ─── Plugins ──────────────────────────────────────────────────────────
         .plugin(
             tauri_plugin_log::Builder::new()
                 .targets([
@@ -23,8 +45,40 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_clipboard_manager::init())
-        // Les commandes métier seront ajoutées au fil des tâches T03–T10
-        .invoke_handler(tauri::generate_handler![])
+        // ─── Commandes IPC ────────────────────────────────────────────────────
+        .invoke_handler(tauri::generate_handler![
+            // T03 — Santé Ollama (check_ollama disponible dès T03 pour HomeView)
+            commands::translate::check_ollama,
+            commands::translate::list_ollama_models,
+            commands::translate::cancel_translation,
+            commands::translate::start_translation,
+            // T03 — CRUD projets / strings
+            commands::db_commands::list_projects,
+            commands::db_commands::create_project,
+            commands::db_commands::delete_project,
+            commands::db_commands::store_strings,
+            commands::db_commands::get_project_strings,
+            commands::db_commands::get_project_progress,
+            // T04 — Détection moteur
+            commands::detect::detect_engine,
+            // T05/T10 — Extraction RPG Maker
+            commands::parse::extract_rpgmv,
+            commands::parse::extract_speakers,
+            commands::parse::extract_rpgm_classic,
+            // T07 — Réinjection RPG Maker
+            commands::write::write_rpgmv,
+            // T10 — Déchiffrement .rgss*
+            commands::decrypt::decrypt_rgss,
+            // T08 — Glossaire
+            commands::glossary::list_glossary,
+            commands::glossary::add_glossary_term,
+            commands::glossary::update_glossary_term,
+            commands::glossary::delete_glossary_term,
+            commands::glossary::import_speakers,
+            // T09 — Wolf RPG
+            commands::wolf::extract_wolf,
+            commands::wolf::inject_wolf,
+        ])
         .run(tauri::generate_context!())
         .expect("Erreur au démarrage de NeoGlot");
 }

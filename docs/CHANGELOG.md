@@ -11,6 +11,30 @@ _Aucun changement en attente de release._
 
 ---
 
+## [0.3.0] — 2026-03-08
+
+### Added — T03 : Scaffold Rust Commands (DB + State)
+
+**Backend Rust**
+- `src-tauri/src/db.rs` — `get_db_path()`, `open()` (WAL + foreign keys), `init_schema()` : 6 tables (`projects`, `files`, `strings`, `translation_cache`, `glossary`, `translation_jobs`) + 3 index
+- `src-tauri/src/lib.rs` — `AppState { db_path: PathBuf, translation_running: Mutex<bool> }` + initialisation DB au démarrage + tous les plugins branchés + `generate_handler![]` complet
+- `src-tauri/src/commands/mod.rs` — déclaration des 8 modules commandes
+- `src-tauri/src/commands/db_commands.rs` — CRUD complet : `list_projects`, `create_project`, `delete_project`, `store_strings`, `get_project_strings`, `get_project_progress`
+- `src-tauri/src/commands/translate.rs` — `check_ollama()` et `list_ollama_models()` fonctionnels (reqwest blocking) ; stubs `start_translation` / `cancel_translation`
+- `src-tauri/src/commands/detect.rs` — `detect_engine()` complet (6 moteurs détectés par fichiers marqueurs)
+- `src-tauri/src/commands/parse.rs` — stub (T05)
+- `src-tauri/src/commands/write.rs` — stub (T07)
+- `src-tauri/src/commands/decrypt.rs` — stub (T10)
+- `src-tauri/src/commands/glossary.rs` — stub avec types (T08)
+- `src-tauri/src/commands/wolf.rs` — stub (T09)
+
+### Changed
+
+- `src-tauri/Cargo.toml` — ajout `dirs = "5"` pour résolution du chemin DB cross-platform
+- `tasks/T03-rust-commands.md` — statut DONE
+
+---
+
 ## [0.2.0] — 2026-03-08
 
 ### Added — T02 : App Shell, Routing et Layout
