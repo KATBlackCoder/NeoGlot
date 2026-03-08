@@ -7,7 +7,16 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 ## [Unreleased]
 
-_Aucun changement en attente de release._
+### Added — Préparation T09 : Binaires Wolf RPG
+
+- `src-tauri/resources/WolfTL.exe` — outil d'extraction/réinjection Wolf RPG (placé manuellement)
+- `src-tauri/resources/UberWolfCli.exe` — outil de déchiffrement archives Wolf RPG (placé manuellement)
+- `src-tauri/tauri.conf.json` — `"resources": ["resources/*"]` pour bundler les exécutables Wolf RPG
+
+### Changed
+- `tasks/T09-wolf-rpg.md` — chemin final : `src-tauri/resources/` (flat, sans sous-dossier)
+- `docs/04-game-engines.md` — solution Linux documentée (`resources/` + Wine)
+- `docs/PROGRESS.md` — statut binaires Wolf RPG mis à jour (✅ déjà en place)
 
 ---
 

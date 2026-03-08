@@ -143,12 +143,10 @@ game_path/
 ### Problème Linux
 
 UberWolf et WolfTL sont des `.exe` Windows uniquement.
-**Solutions** :
-1. **Wine** — bundler UberWolf + WolfTL + appeler via `wine <exe>` (solution court terme)
-2. **Port Rust** — les sources MIT sont disponibles, portage natif (solution long terme)
-3. **Bundler l'exe** — inclure les `.exe` dans les ressources Tauri et les exécuter via Wine
 
-**Recommandation MVP** : option 1 (Wine). Documenter la dépendance Wine dans le README.
+**Solution retenue** : binaires placés dans `src-tauri/resources/` (bundlés via `"resources": ["resources/*"]` dans `tauri.conf.json`), exécutés via `wine <exe>` sur Linux et directement sur Windows. Wine est une dépendance à documenter dans le README.
+
+**Alternative long terme** : portage Rust natif (sources MIT disponibles).
 
 ### Versions WolfPro supportées (UberWolf)
 

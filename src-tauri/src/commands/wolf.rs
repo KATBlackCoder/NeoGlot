@@ -1,4 +1,5 @@
 // Module Wolf RPG — extraction et réinjection via WolfTL + UberWolf (subprocess)
+// Binaires : src-tauri/resources/WolfTL.exe + UberWolfCli.exe (bundlés via tauri.conf.json "resources")
 // Implémenté en T09
 
 #[tauri::command]

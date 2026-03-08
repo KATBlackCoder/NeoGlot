@@ -48,7 +48,9 @@ src/
 ├── router/        # Vue Router (createWebHashHistory)
 ├── types/         # TypeScript interfaces (Project, GlossaryEntry...)
 └── lib/           # Utilitaires (cn() Tailwind)
-src-tauri/     # Rust/Tauri backend (parsing, SQLite, Ollama, Wolf RPG)
+src-tauri/
+├── resources/ # Binaires Wolf RPG : WolfTL.exe + UberWolfCli.exe (bundlés via tauri.conf.json)
+└── src/       # Rust/Tauri backend (parsing, SQLite, Ollama, Wolf RPG)
 ```
 
 ## Key Documents

@@ -159,7 +159,7 @@ T10 ░░░░░░░░░░ TODO  (dépend T05, T07)
 **Statut** : TODO — _dépend T04, T06_
 
 **À faire :**
-- Bundler `UberWolfCli.exe` + `WolfTL.exe` dans `src-tauri/resources/wolf/`
+- Binaires `UberWolfCli.exe` + `WolfTL.exe` déjà placés dans `src-tauri/resources/` ✅
 - Rust : `commands/wolf.rs` → `extract_wolf()` + `inject_wolf()` via `std::process::Command`
 - Linux : `wine <exe>` avec `#[cfg(target_os)]`
 

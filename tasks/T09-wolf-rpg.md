@@ -20,7 +20,7 @@ Supporter les jeux Wolf RPG Editor via les outils UberWolf (déchiffrement) et W
 
 ### Stratégie Linux
 
-- Bundler les `.exe` dans les ressources Tauri (`src-tauri/resources/wolf/`)
+- Bundler les `.exe` dans les ressources Tauri (`src-tauri/resources/`)
 - Exécuter via `wine <exe>` sur Linux
 - Sur Windows : exécuter directement
 
@@ -46,15 +46,15 @@ fn get_wolf_command(exe_name: &str, exe_path: &Path) -> std::process::Command {
 
 ### 1. Bundler les outils Wolf RPG
 
-Créer `src-tauri/resources/wolf/` et y placer :
-- `UberWolfCli.exe`
-- `WolfTL.exe`
+Les binaires sont placés dans `src-tauri/resources/` (déjà fait) :
+- `src-tauri/resources/UberWolfCli.exe` ✅
+- `src-tauri/resources/WolfTL.exe` ✅
 
-Dans `tauri.conf.json` :
+Dans `tauri.conf.json` (déjà configuré) :
 ```json
 {
   "bundle": {
-    "resources": ["resources/wolf/*"]
+    "resources": ["resources/*"]
   }
 }
 ```
@@ -66,7 +66,7 @@ use tauri::Manager;
 fn get_wolf_exe(app: &tauri::AppHandle, name: &str) -> PathBuf {
     app.path().resource_dir()
         .unwrap()
-        .join("resources/wolf")
+        .join("resources")
         .join(name)
 }
 ```
@@ -98,7 +98,7 @@ fn is_encrypted(game_dat_path: &Path) -> bool {
 fn run_wolf_exe(app: &AppHandle, exe_name: &str, args: &[&str]) -> Result<(), String> {
     let exe_path = app.path().resource_dir()
         .map_err(|e| e.to_string())?
-        .join("resources/wolf")
+        .join("resources")
         .join(exe_name);
 
     #[cfg(target_os = "windows")]
